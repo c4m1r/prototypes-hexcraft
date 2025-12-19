@@ -29,6 +29,8 @@ export class World {
   // Лимитируем только аварийные попытки, когда size=0, чтобы не спамить консоль.
   private maxEmergencyAttempts: number = 20;
   private emergencyAttempts: number = 0;
+  private stopEmergencyLogs: boolean = false;
+  private fallbackInjected: boolean = false;
 
   constructor(scene: THREE.Scene, settings?: GameSettings) {
     this.scene = scene;
@@ -84,14 +86,29 @@ export class World {
       if (this.emergencyAttempts < this.maxEmergencyAttempts) {
         this.forceLoadAround(playerChunk.q, playerChunk.r);
         this.emergencyAttempts += 1;
-      } else if (this.debugLogsLeft > 0) {
-        console.error('[World] Достигнут лимит попыток загрузки чанков, прекращаю попытки');
-        this.debugLogsLeft -= 1;
+      } else if (!this.stopEmergencyLogs) {
+        console.error('[World] Достигнут лимит попыток загрузки чанков, прекращаю аварийные попытки');
+        this.stopEmergencyLogs = true;
+        if (!this.fallbackInjected) {
+          this.injectFallbackChunk(playerChunk.q, playerChunk.r);
+        }
       }
       if (this.debugLogsLeft > 0) {
         console.warn(
           `[World] chunks.size=0 перед циклом, playerChunk=${playerChunk.q},${playerChunk.r}, attempts=${this.emergencyAttempts}`
         );
+        this.debugLogsLeft -= 1;
+      }
+
+      if (this.emergencyAttempts >= this.maxEmergencyAttempts) {
+        return;
+      }
+    } else {
+      this.emergencyAttempts = 0;
+      this.stopEmergencyLogs = false;
+
+      if (this.debugLogsLeft > 0) {
+        console.info(`[World] update ok chunks=${this.chunks.size} meshes=${this.chunkMeshes.size}`);
         this.debugLogsLeft -= 1;
       }
     }
@@ -326,6 +343,30 @@ export class World {
     this.fogBarrier = new THREE.Mesh(geometry, material);
     this.fogBarrier.position.y = 50;
     this.scene.add(this.fogBarrier);
+  }
+
+  private injectFallbackChunk(centerQ: number, centerR: number): void {
+    const key = getChunkKey(centerQ, centerR);
+    if (this.chunks.has(key)) return;
+
+    const block: Block = {
+      type: 'grass',
+      position: { q: centerQ * this.chunkSize, r: centerR * this.chunkSize, s: -(centerQ * this.chunkSize + centerR * this.chunkSize), y: 0 }
+    };
+
+    const chunk: Chunk = {
+      position: { q: centerQ, r: centerR },
+      blocks: [block],
+      blockMap: new Map<string, Block>([[`${block.position.q},${block.position.r},${block.position.y}`, block]]),
+      biome: 'fallback'
+    };
+
+    this.chunks.set(key, chunk);
+    this.loadAttempts += 1;
+    this.fallbackInjected = true;
+    this.createChunkMeshes(chunk);
+
+    console.error('[World] Fallback чанк добавлен, так как генерация не дала ни одного чанка');
   }
 
   private updateFogBarrier(playerX: number, playerZ: number): void {
