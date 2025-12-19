@@ -12,6 +12,9 @@ export interface GameState {
   targetBlock: string | null;
   showFogBarrier: boolean;
   currentTime: string;
+  health: number;
+  stamina: number;
+  hunger: number;
 }
 
 export class Game {
@@ -27,6 +30,10 @@ export class Game {
   private onStateChange?: (state: GameState) => void;
   private ambientLight: THREE.AmbientLight;
   private directionalLight: THREE.DirectionalLight;
+  private health: number = 100;
+  private stamina: number = 100;
+  private hunger: number = 100;
+  private staminaDrainAccumulator: number = 0;
 
   constructor(canvas: HTMLCanvasElement, onStateChange?: (state: GameState) => void, settings?: GameSettings) {
     this.onStateChange = onStateChange;
@@ -104,10 +111,16 @@ export class Game {
     const deltaTime = (currentTime - this.lastTime) / 1000;
     this.lastTime = currentTime;
 
+    let didJump = false;
     this.player.update(
       Math.min(deltaTime, 0.1),
-      (x, z) => this.world.getHeightAt(x, z)
+      (x, z) => this.world.getHeightAt(x, z),
+      () => {
+        didJump = true;
+      }
     );
+
+    this.updateStamina(Math.min(deltaTime, 0.1), didJump);
 
     this.world.update(this.player.position.x, this.player.position.z);
 
@@ -125,10 +138,31 @@ export class Game {
         isFlying: this.player.isFlying,
         targetBlock: targetedBlock?.name || null,
         showFogBarrier: this.world.getFogBarrierState(),
-        currentTime: this.dayNightCycle.getCurrentTime()
+        currentTime: this.dayNightCycle.getCurrentTime(),
+        health: this.health,
+        stamina: this.stamina,
+        hunger: this.hunger
       });
     }
 
     this.renderer.render(this.scene, this.camera);
+  }
+
+  private updateStamina(deltaTime: number, didJump: boolean): void {
+    if (didJump && this.stamina > 0) {
+      this.stamina = Math.max(0, this.stamina - 5);
+    }
+
+    if (this.player.isSprinting && this.stamina > 0) {
+      this.staminaDrainAccumulator += deltaTime;
+      while (this.staminaDrainAccumulator >= 0.5 && this.stamina > 0) {
+        this.stamina = Math.max(0, this.stamina - 1);
+        this.staminaDrainAccumulator -= 0.5;
+      }
+    } else {
+      this.staminaDrainAccumulator = 0;
+    }
+
+    this.player.setSprintAllowed(this.stamina > 0);
   }
 }

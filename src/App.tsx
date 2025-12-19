@@ -21,7 +21,10 @@ function App() {
     isFlying: true,
     targetBlock: null,
     showFogBarrier: true,
-    currentTime: '06:00'
+    currentTime: '06:00',
+    health: 100,
+    stamina: 100,
+    hunger: 100
   });
 
   useEffect(() => {
@@ -119,6 +122,9 @@ function App() {
             showFogBarrier={gameState.showFogBarrier}
             currentTime={gameState.currentTime}
             showHelpHint={showHelpHint}
+            health={gameState.health}
+            stamina={gameState.stamina}
+            hunger={gameState.hunger}
           />
         </>
       )}

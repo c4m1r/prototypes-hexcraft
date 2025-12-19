@@ -5,11 +5,13 @@ export class PlayerController {
   public rotation: THREE.Euler;
   public velocity: THREE.Vector3;
   public isFlying: boolean = true;
+  public isSprinting: boolean = false;
   private lastSpacePress: number = 0;
   private readonly DOUBLE_TAP_TIME = 300;
 
   private keys: { [key: string]: boolean } = {};
   private speed: number = 10;
+  private sprintMultiplier: number = 1.5;
   private flySpeed: number = 15;
   private jumpForce: number = 12;
   private gravity: number = 30;
@@ -17,6 +19,8 @@ export class PlayerController {
   private isGrounded: boolean = false;
   private mouseSensitivity: number = 0.002;
   private isPointerLocked: boolean = false;
+  private sprintAllowed: boolean = true;
+  private pendingJump: boolean = false;
 
   constructor(camera: THREE.PerspectiveCamera) {
     this.camera = camera;
@@ -37,12 +41,13 @@ export class PlayerController {
           this.isFlying = !this.isFlying;
           if (this.isFlying) {
             this.velocity.y = 0;
+            this.pendingJump = false;
           }
         }
         this.lastSpacePress = now;
 
-        if (!this.isFlying && this.isGrounded) {
-          this.velocity.y = this.jumpForce;
+        if (!this.isFlying) {
+          this.pendingJump = true;
         }
       }
     });
@@ -71,14 +76,32 @@ export class PlayerController {
     });
   }
 
-  update(deltaTime: number, getHeightAt: (x: number, z: number) => number): void {
-    const moveSpeed = this.isFlying ? this.flySpeed : this.speed;
+  update(
+    deltaTime: number,
+    getHeightAt: (x: number, z: number) => number,
+    onJump?: () => void
+  ): void {
+    const sprintKey = this.keys['ShiftLeft'];
+    this.isSprinting = false;
+
+    let moveSpeed = this.isFlying ? this.flySpeed : this.speed;
     const direction = new THREE.Vector3();
 
     if (this.keys['KeyW']) direction.z -= 1;
     if (this.keys['KeyS']) direction.z += 1;
     if (this.keys['KeyA']) direction.x -= 1;
     if (this.keys['KeyD']) direction.x += 1;
+
+    if (!this.isFlying && sprintKey && this.sprintAllowed && direction.length() > 0) {
+      this.isSprinting = true;
+      moveSpeed = this.speed * this.sprintMultiplier;
+    }
+
+    if (!this.isFlying && this.pendingJump && this.isGrounded) {
+      this.velocity.y = this.jumpForce;
+      this.pendingJump = false;
+      if (onJump) onJump();
+    }
 
     if (direction.length() > 0) {
       direction.normalize();
@@ -124,5 +147,12 @@ export class PlayerController {
     const direction = new THREE.Vector3(0, 0, -1);
     direction.applyEuler(this.rotation);
     return direction;
+  }
+
+  setSprintAllowed(allowed: boolean): void {
+    this.sprintAllowed = allowed;
+    if (!allowed) {
+      this.isSprinting = false;
+    }
   }
 }

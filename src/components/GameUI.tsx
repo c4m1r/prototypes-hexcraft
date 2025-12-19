@@ -8,6 +8,9 @@ interface GameUIProps {
   showFogBarrier: boolean;
   currentTime: string;
   showHelpHint?: boolean;
+  health: number;
+  stamina: number;
+  hunger: number;
 }
 
 export function GameUI({
@@ -17,7 +20,10 @@ export function GameUI({
   targetBlock,
   showFogBarrier,
   currentTime,
-  showHelpHint = false
+  showHelpHint = false,
+  health,
+  stamina,
+  hunger
 }: GameUIProps) {
   const [helpVisible, setHelpVisible] = useState(showHelpHint);
 
@@ -44,6 +50,46 @@ export function GameUI({
           Press ~ for help
         </div>
       )}
+
+      {/* Статус-бары: здоровье, энергия, голод */}
+      <div className="fixed bottom-6 right-6 flex flex-col gap-3 pointer-events-none w-64">
+        <div className="flex items-center gap-3">
+          <span className="text-xl">❤️</span>
+          <div className="relative flex-1 h-4 bg-black/40 rounded-full border border-white/20 overflow-hidden">
+            <div
+              className="h-full bg-red-500 rounded-full opacity-80"
+              style={{ width: `${Math.max(0, Math.min(health, 100))}%` }}
+            ></div>
+            <span className="absolute inset-0 flex items-center justify-center text-xs text-white/90 font-semibold">
+              {Math.round(health)}
+            </span>
+          </div>
+        </div>
+        <div className="flex items-center gap-3">
+          <span className="text-xl text-green-300">⚡</span>
+          <div className="relative flex-1 h-4 bg-black/40 rounded-full border border-white/20 overflow-hidden">
+            <div
+              className="h-full bg-green-400 rounded-full opacity-80"
+              style={{ width: `${Math.max(0, Math.min(stamina, 100))}%` }}
+            ></div>
+            <span className="absolute inset-0 flex items-center justify-center text-xs text-white/90 font-semibold">
+              {Math.round(stamina)}
+            </span>
+          </div>
+        </div>
+        <div className="flex items-center gap-3">
+          <span className="text-xl">🍞</span>
+          <div className="relative flex-1 h-4 bg-black/40 rounded-full border border-white/20 overflow-hidden">
+            <div
+              className="h-full rounded-full opacity-80"
+              style={{ width: `${Math.max(0, Math.min(hunger, 100))}%`, backgroundColor: '#d7c28a' }}
+            ></div>
+            <span className="absolute inset-0 flex items-center justify-center text-xs text-white/90 font-semibold">
+              {Math.round(hunger)}
+            </span>
+          </div>
+        </div>
+      </div>
 
       <div id="hotbar" className="fixed bottom-8 left-1/2 -translate-x-1/2 pointer-events-none"></div>
 

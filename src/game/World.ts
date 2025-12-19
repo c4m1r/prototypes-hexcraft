@@ -104,6 +104,9 @@ export class World {
       if (!material) return;
 
       const mesh = new THREE.InstancedMesh(this.blockGeometry, material, blocks.length);
+      // Отключаем отсечение по фруструму: boundingSphere базовой геометрии не учитывает смещения экземпляров,
+      // из-за чего инстансы пропадают, когда камера уходит от (0,0,0).
+      mesh.frustumCulled = false;
       const matrix = new THREE.Matrix4();
 
       blocks.forEach((block, index) => {
