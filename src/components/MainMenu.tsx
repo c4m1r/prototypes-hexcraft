@@ -59,11 +59,11 @@ export function MainMenu({ onNewGame, onLoadGame, onCoop, onOptions, onAbout }: 
 
       <div className="absolute bottom-8 left-8 text-green-500 text-sm font-mono animate-wave">
         <a
-          href="https://c4m1r.github.io/prototypes-hexcraft/"
+          href="https://c4m1r.github.io/"
           target="_self"
           className="hover:underline"
         >
-          Prototype 0.0.11 | C4m1r.github.io
+          Prototype 0.0.12 | C4m1r.github.io
         </a>
       </div>
     </div>

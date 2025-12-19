@@ -171,6 +171,8 @@ export class World {
       if (!material) return;
 
       const mesh = new THREE.InstancedMesh(this.blockGeometry, material, blocks.length);
+      // Инстансы расположены далеко от (0,0,0), без этого boundingSphere отсечет их.
+      mesh.frustumCulled = false;
       const matrix = new THREE.Matrix4();
 
       blocks.forEach((block, index) => {
@@ -303,23 +305,42 @@ export class World {
   }
 
   private unloadDistantChunks(playerChunkQ: number, playerChunkR: number): void {
-    const chunksToRemove: string[] = [];
+    const unloadDistance = Math.max(this.renderDistance + 2, 7);
 
-    this.chunks.forEach((chunk, key) => {
+    // Сначала удаляем явно дальние чанки.
+    const entries = Array.from(this.chunks.entries()).map(([key, chunk]) => {
       const distance = Math.max(
         Math.abs(chunk.position.q - playerChunkQ),
         Math.abs(chunk.position.r - playerChunkR)
       );
-
-      if (distance > 7 || this.chunks.size > this.maxLoadedChunks) {
-        chunksToRemove.push(key);
-      }
+      return { key, chunk, distance };
     });
 
-    chunksToRemove.forEach(key => {
-      this.removeChunkMeshes(key);
-      this.chunks.delete(key);
-    });
+    entries
+      .filter(e => e.distance > unloadDistance)
+      .forEach(e => {
+        this.removeChunkMeshes(e.key);
+        this.chunks.delete(e.key);
+      });
+
+    // Если после этого всё ещё превышаем лимит по количеству, удаляем самые дальние.
+    if (this.chunks.size > this.maxLoadedChunks) {
+      const remaining = Array.from(this.chunks.entries()).map(([key, chunk]) => {
+        const distance = Math.max(
+          Math.abs(chunk.position.q - playerChunkQ),
+          Math.abs(chunk.position.r - playerChunkR)
+        );
+        return { key, distance };
+      });
+
+      remaining
+        .sort((a, b) => b.distance - a.distance)
+        .slice(0, Math.max(0, this.chunks.size - this.maxLoadedChunks))
+        .forEach(e => {
+          this.removeChunkMeshes(e.key);
+          this.chunks.delete(e.key);
+        });
+    }
   }
 
   private forceLoadAround(centerQ: number, centerR: number): void {
