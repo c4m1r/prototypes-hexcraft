@@ -23,6 +23,8 @@ export class World {
   private renderDistance: number = 3;
   private fogDensity: number = 1;
   private generatorSeed: number = 0;
+  private loadAttempts: number = 0;
+  private initialized: boolean = false;
 
   constructor(scene: THREE.Scene, settings?: GameSettings) {
     this.scene = scene;
@@ -57,6 +59,7 @@ export class World {
     console.info(
       `[World] init seed=${this.generatorSeed} chunkSize=${this.chunkSize} renderDistance=${this.renderDistance} maxLoaded=${this.maxLoadedChunks}`
     );
+    this.initialized = true;
     for (let q = -1; q <= 1; q++) {
       for (let r = -1; r <= 1; r++) {
         this.loadChunk(q, r);
@@ -66,6 +69,11 @@ export class World {
 
   update(playerX: number, playerZ: number): void {
     const playerChunk = worldToChunk(playerX, playerZ, this.chunkSize);
+
+    if (this.chunks.size === 0) {
+      console.warn('[World] Нет загруженных чанков, принудительная загрузка вокруг игрока');
+      this.forceLoadAround(playerChunk.q, playerChunk.r);
+    }
 
     for (let q = playerChunk.q - this.renderDistance; q <= playerChunk.q + this.renderDistance; q++) {
       for (let r = playerChunk.r - this.renderDistance; r <= playerChunk.r + this.renderDistance; r++) {
@@ -86,6 +94,7 @@ export class World {
 
     const chunk = this.generator.generateChunk(chunkQ, chunkR);
     this.chunks.set(key, chunk);
+    this.loadAttempts += 1;
 
     this.createChunkMeshes(chunk);
 
@@ -266,6 +275,14 @@ export class World {
     });
   }
 
+  private forceLoadAround(centerQ: number, centerR: number): void {
+    for (let q = centerQ - 1; q <= centerQ + 1; q++) {
+      for (let r = centerR - 1; r <= centerR + 1; r++) {
+        this.loadChunk(q, r);
+      }
+    }
+  }
+
   private createFogBarrier(): void {
     const barrierSize = 9 * this.chunkSize * 1.732;
     const geometry = new THREE.BoxGeometry(barrierSize, 100, barrierSize);
@@ -313,6 +330,8 @@ export class World {
     renderDistance: number;
     chunkSize: number;
     maxLoadedChunks: number;
+    loadAttempts: number;
+    initialized: boolean;
   } {
     let meshBatches = 0;
     this.chunkMeshes.forEach(map => {
@@ -325,7 +344,9 @@ export class World {
       meshBatches,
       renderDistance: this.renderDistance,
       chunkSize: this.chunkSize,
-      maxLoadedChunks: this.maxLoadedChunks
+      maxLoadedChunks: this.maxLoadedChunks,
+      loadAttempts: this.loadAttempts,
+      initialized: this.initialized
     };
   }
 }

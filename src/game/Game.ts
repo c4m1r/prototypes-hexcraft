@@ -147,7 +147,7 @@ export class Game {
         stamina: this.stamina,
         hunger: this.hunger,
         generationCode: `seed-${worldDebug.seed}`,
-        generationStatus: `chunks:${worldDebug.loadedChunks} meshes:${worldDebug.meshBatches} rd:${worldDebug.renderDistance} cs:${worldDebug.chunkSize}/${worldDebug.maxLoadedChunks}`
+        generationStatus: `chunks:${worldDebug.loadedChunks} meshes:${worldDebug.meshBatches} rd:${worldDebug.renderDistance} cs:${worldDebug.chunkSize}/${worldDebug.maxLoadedChunks} loads:${worldDebug.loadAttempts} init:${worldDebug.initialized ? '1' : '0'}`
       });
     }
 
