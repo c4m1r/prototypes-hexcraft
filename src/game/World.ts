@@ -54,6 +54,9 @@ export class World {
   }
 
   initialize(): void {
+    console.info(
+      `[World] init seed=${this.generatorSeed} chunkSize=${this.chunkSize} renderDistance=${this.renderDistance} maxLoaded=${this.maxLoadedChunks}`
+    );
     for (let q = -1; q <= 1; q++) {
       for (let r = -1; r <= 1; r++) {
         this.loadChunk(q, r);
@@ -88,6 +91,8 @@ export class World {
 
     if (chunk.blocks.length === 0) {
       console.warn(`[World] Пустой чанк ${key} biome=${chunk.biome}`);
+    } else {
+      console.debug(`[World] Чанк ${key} biome=${chunk.biome} blocks=${chunk.blocks.length}`);
     }
   }
 
@@ -110,9 +115,6 @@ export class World {
       if (!material) return;
 
       const mesh = new THREE.InstancedMesh(this.blockGeometry, material, blocks.length);
-      // Отключаем отсечение по фруструму: boundingSphere базовой геометрии не учитывает смещения экземпляров,
-      // из-за чего инстансы пропадают, когда камера уходит от (0,0,0).
-      mesh.frustumCulled = false;
       const matrix = new THREE.Matrix4();
 
       blocks.forEach((block, index) => {
