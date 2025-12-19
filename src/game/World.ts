@@ -25,6 +25,10 @@ export class World {
   private generatorSeed: number = 0;
   private loadAttempts: number = 0;
   private initialized: boolean = false;
+  private debugLogsLeft: number = 20;
+  // Лимитируем только аварийные попытки, когда size=0, чтобы не спамить консоль.
+  private maxEmergencyAttempts: number = 20;
+  private emergencyAttempts: number = 0;
 
   constructor(scene: THREE.Scene, settings?: GameSettings) {
     this.scene = scene;
@@ -65,6 +69,11 @@ export class World {
         this.loadChunk(q, r);
       }
     }
+
+    if (this.chunks.size === 0 && this.debugLogsLeft > 0) {
+      console.error('[World] После initialize чанки не загружены, size=0');
+      this.debugLogsLeft -= 1;
+    }
   }
 
   update(playerX: number, playerZ: number): void {
@@ -72,7 +81,19 @@ export class World {
 
     if (this.chunks.size === 0) {
       console.warn('[World] Нет загруженных чанков, принудительная загрузка вокруг игрока');
-      this.forceLoadAround(playerChunk.q, playerChunk.r);
+      if (this.emergencyAttempts < this.maxEmergencyAttempts) {
+        this.forceLoadAround(playerChunk.q, playerChunk.r);
+        this.emergencyAttempts += 1;
+      } else if (this.debugLogsLeft > 0) {
+        console.error('[World] Достигнут лимит попыток загрузки чанков, прекращаю попытки');
+        this.debugLogsLeft -= 1;
+      }
+      if (this.debugLogsLeft > 0) {
+        console.warn(
+          `[World] chunks.size=0 перед циклом, playerChunk=${playerChunk.q},${playerChunk.r}, attempts=${this.emergencyAttempts}`
+        );
+        this.debugLogsLeft -= 1;
+      }
     }
 
     for (let q = playerChunk.q - this.renderDistance; q <= playerChunk.q + this.renderDistance; q++) {
@@ -93,6 +114,10 @@ export class World {
     if (this.chunks.has(key)) return;
 
     const chunk = this.generator.generateChunk(chunkQ, chunkR);
+    if (this.debugLogsLeft > 0) {
+      console.info(`[World] loadChunk start key=${key} beforeSize=${this.chunks.size}`);
+    }
+
     this.chunks.set(key, chunk);
     this.loadAttempts += 1;
 
@@ -102,6 +127,11 @@ export class World {
       console.warn(`[World] Пустой чанк ${key} biome=${chunk.biome}`);
     } else {
       console.debug(`[World] Чанк ${key} biome=${chunk.biome} blocks=${chunk.blocks.length}`);
+    }
+
+    if (this.debugLogsLeft > 0) {
+      console.info(`[World] loadChunk done key=${key} afterSize=${this.chunks.size} blocks=${chunk.blocks.length}`);
+      this.debugLogsLeft -= 1;
     }
   }
 
@@ -332,6 +362,8 @@ export class World {
     maxLoadedChunks: number;
     loadAttempts: number;
     initialized: boolean;
+    emergencyAttempts: number;
+    maxEmergencyAttempts: number;
   } {
     let meshBatches = 0;
     this.chunkMeshes.forEach(map => {
@@ -346,7 +378,9 @@ export class World {
       chunkSize: this.chunkSize,
       maxLoadedChunks: this.maxLoadedChunks,
       loadAttempts: this.loadAttempts,
-      initialized: this.initialized
+      initialized: this.initialized,
+      emergencyAttempts: this.emergencyAttempts,
+      maxEmergencyAttempts: this.maxEmergencyAttempts
     };
   }
 }
