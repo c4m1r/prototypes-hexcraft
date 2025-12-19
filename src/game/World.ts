@@ -40,6 +40,16 @@ export class World {
     this.renderDistance = finalSettings.renderDistance;
     this.fogDensity = finalSettings.fogDensity;
 
+    // Чтобы избежать постоянного удаления/добавления чанков, гарантируем,
+    // что лимит загруженных чанков покрывает радиус видимости.
+    const requiredChunks = 1 + 3 * this.renderDistance * (this.renderDistance + 1); // формула количества гексов в радиусе
+    if (this.maxLoadedChunks < requiredChunks) {
+      console.warn(
+        `[World] maxLoadedChunks повышен ${this.maxLoadedChunks} -> ${requiredChunks} для renderDistance=${this.renderDistance}`
+      );
+      this.maxLoadedChunks = requiredChunks;
+    }
+
     this.generator = new ChunkGenerator(this.chunkSize);
     this.generatorSeed = this.generator.getSeed();
     this.blockGeometry = createHexGeometry();
@@ -129,6 +139,14 @@ export class World {
   private loadChunk(chunkQ: number, chunkR: number): void {
     const key = getChunkKey(chunkQ, chunkR);
     if (this.chunks.has(key)) return;
+
+    if (this.chunks.size >= this.maxLoadedChunks) {
+      if (this.debugLogsLeft > 0) {
+        console.warn(`[World] Пропуск loadChunk key=${key}, достигнут лимит ${this.maxLoadedChunks}`);
+        this.debugLogsLeft -= 1;
+      }
+      return;
+    }
 
     const chunk = this.generator.generateChunk(chunkQ, chunkR);
     if (this.debugLogsLeft > 0) {
