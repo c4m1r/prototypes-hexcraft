@@ -15,6 +15,8 @@ export interface GameState {
   health: number;
   stamina: number;
   hunger: number;
+  generationCode: string;
+  generationStatus: string;
 }
 
 export class Game {
@@ -34,6 +36,7 @@ export class Game {
   private stamina: number = 100;
   private hunger: number = 100;
   private staminaDrainAccumulator: number = 0;
+  private staminaRegenAccumulator: number = 0;
 
   constructor(canvas: HTMLCanvasElement, onStateChange?: (state: GameState) => void, settings?: GameSettings) {
     this.onStateChange = onStateChange;
@@ -127,6 +130,7 @@ export class Game {
     this.dayNightCycle.update(Math.min(deltaTime, 0.1));
 
     const targetedBlock = this.raycastManager.getTargetedBlock(this.camera);
+    const worldDebug = this.world.getDebugInfo();
 
     if (this.onStateChange) {
       this.onStateChange({
@@ -141,7 +145,9 @@ export class Game {
         currentTime: this.dayNightCycle.getCurrentTime(),
         health: this.health,
         stamina: this.stamina,
-        hunger: this.hunger
+        hunger: this.hunger,
+        generationCode: `seed-${worldDebug.seed}`,
+        generationStatus: `chunks:${worldDebug.loadedChunks} meshes:${worldDebug.meshBatches} rd:${worldDebug.renderDistance} cs:${worldDebug.chunkSize}/${worldDebug.maxLoadedChunks}`
       });
     }
 
@@ -159,8 +165,19 @@ export class Game {
         this.stamina = Math.max(0, this.stamina - 1);
         this.staminaDrainAccumulator -= 0.5;
       }
+      this.staminaRegenAccumulator = 0;
     } else {
       this.staminaDrainAccumulator = 0;
+
+      if (this.stamina < 100) {
+        this.staminaRegenAccumulator += deltaTime;
+        while (this.staminaRegenAccumulator >= 1 && this.stamina < 100) {
+          this.stamina = Math.min(100, this.stamina + 1);
+          this.staminaRegenAccumulator -= 1;
+        }
+      } else {
+        this.staminaRegenAccumulator = 0;
+      }
     }
 
     this.player.setSprintAllowed(this.stamina > 0);

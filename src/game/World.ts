@@ -22,6 +22,7 @@ export class World {
   private showFogBarrier: boolean = true;
   private renderDistance: number = 3;
   private fogDensity: number = 1;
+  private generatorSeed: number = 0;
 
   constructor(scene: THREE.Scene, settings?: GameSettings) {
     this.scene = scene;
@@ -32,6 +33,7 @@ export class World {
     this.fogDensity = finalSettings.fogDensity;
 
     this.generator = new ChunkGenerator(this.chunkSize);
+    this.generatorSeed = this.generator.getSeed();
     this.blockGeometry = createHexGeometry();
 
     BLOCK_TYPES.forEach(blockType => {
@@ -83,6 +85,10 @@ export class World {
     this.chunks.set(key, chunk);
 
     this.createChunkMeshes(chunk);
+
+    if (chunk.blocks.length === 0) {
+      console.warn(`[World] Пустой чанк ${key} biome=${chunk.biome}`);
+    }
   }
 
   private createChunkMeshes(chunk: Chunk): void {
@@ -296,5 +302,28 @@ export class World {
     const baseNear = 50 / this.fogDensity;
     const baseFar = 150 / this.fogDensity;
     this.scene.fog = new THREE.Fog(0x87ceeb, baseNear, baseFar);
+  }
+
+  getDebugInfo(): {
+    seed: number;
+    loadedChunks: number;
+    meshBatches: number;
+    renderDistance: number;
+    chunkSize: number;
+    maxLoadedChunks: number;
+  } {
+    let meshBatches = 0;
+    this.chunkMeshes.forEach(map => {
+      meshBatches += map.size;
+    });
+
+    return {
+      seed: this.generatorSeed,
+      loadedChunks: this.chunks.size,
+      meshBatches,
+      renderDistance: this.renderDistance,
+      chunkSize: this.chunkSize,
+      maxLoadedChunks: this.maxLoadedChunks
+    };
   }
 }

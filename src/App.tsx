@@ -24,7 +24,9 @@ function App() {
     currentTime: '06:00',
     health: 100,
     stamina: 100,
-    hunger: 100
+    hunger: 100,
+    generationCode: 'seed-0',
+    generationStatus: 'chunks:0 meshes:0 rd:0 cs:0/0'
   });
 
   useEffect(() => {
@@ -125,6 +127,8 @@ function App() {
             health={gameState.health}
             stamina={gameState.stamina}
             hunger={gameState.hunger}
+            generationCode={gameState.generationCode}
+            generationStatus={gameState.generationStatus}
           />
         </>
       )}

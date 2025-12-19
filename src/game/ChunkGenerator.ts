@@ -1,10 +1,12 @@
-import { Chunk, Block, BIOMES, BLOCK_TYPES } from '../types/game';
+import { Chunk, Block, BIOMES } from '../types/game';
 
 export class ChunkGenerator {
   private chunkSize: number;
+  private seed: number;
 
-  constructor(chunkSize: number = 14) {
+  constructor(chunkSize: number = 14, seed: number = Math.floor(Math.random() * 1_000_000_000)) {
     this.chunkSize = chunkSize;
+    this.seed = seed;
   }
 
   generateChunk(chunkQ: number, chunkR: number): Chunk {
@@ -50,7 +52,7 @@ export class ChunkGenerator {
   }
 
   private selectBiome(chunkQ: number, chunkR: number): string {
-    const hash = Math.abs(Math.sin(chunkQ * 12.9898 + chunkR * 78.233) * 43758.5453);
+    const hash = Math.abs(Math.sin(chunkQ * 12.9898 + chunkR * 78.233 + this.seed) * 43758.5453);
     const index = Math.floor((hash % 1) * BIOMES.length);
     return BIOMES[index];
   }
@@ -98,8 +100,12 @@ export class ChunkGenerator {
   }
 
   private simpleNoise(x: number, y: number): number {
-    const sin = Math.sin(x * 12.9898 + y * 78.233) * 43758.5453;
+    const sin = Math.sin(x * 12.9898 + y * 78.233 + this.seed) * 43758.5453;
     return (sin - Math.floor(sin));
+  }
+
+  getSeed(): number {
+    return this.seed;
   }
 
   private addTree(blocks: Block[], q: number, r: number, s: number, height: number, biome: string): void {

@@ -11,6 +11,8 @@ interface GameUIProps {
   health: number;
   stamina: number;
   hunger: number;
+  generationCode: string;
+  generationStatus: string;
 }
 
 export function GameUI({
@@ -23,7 +25,9 @@ export function GameUI({
   showHelpHint = false,
   health,
   stamina,
-  hunger
+  hunger,
+  generationCode,
+  generationStatus
 }: GameUIProps) {
   const [helpVisible, setHelpVisible] = useState(showHelpHint);
 
@@ -97,6 +101,13 @@ export function GameUI({
         <div className="fixed left-8 top-8 bg-black/70 text-white px-4 py-3 rounded-lg text-xs space-y-2 pointer-events-none border border-white/30 font-mono">
           <div className="font-bold text-white border-b border-white/30 pb-2">
             TIME: {currentTime}
+          </div>
+
+          <div className="pt-1 text-green-300 font-semibold">
+            Generation code: {generationCode}
+          </div>
+          <div className="text-xs text-gray-200 pb-2">
+            Generation status: {generationStatus}
           </div>
 
           <div>X: {playerPosition.x.toFixed(2)}</div>
