@@ -205,13 +205,15 @@ export class TextureManager {
       sideTexture = this.createTextureFromAtlas(sideUV);
     }
 
-    // Если текстуры разные (например, grass), используем кастомный шейдер
-    const useCustomShader = config.top.row !== config.side.row || config.top.col !== config.side.col;
+    // Если top текстура не задана или текстуры одинаковые, используем side для обеих
+    const hasTopTexture = config.top.row !== undefined && config.top.col !== undefined;
+    const texturesDifferent = config.top.row !== config.side.row || config.top.col !== config.side.col;
+    const useCustomShader = hasTopTexture && texturesDifferent;
 
     if (useCustomShader) {
       return this.createDualTextureMaterial(topTexture, sideTexture, config);
     } else {
-      // Если текстуры одинаковые, используем обычный материал
+      // Если текстуры одинаковые или top не задан, используем side для всех граней
       const material = new THREE.MeshLambertMaterial({
         map: sideTexture,
         transparent: config.transparent || false,
@@ -219,7 +221,7 @@ export class TextureManager {
         side: config.transparent ? THREE.DoubleSide : THREE.FrontSide
       });
 
-      (material as any).topTexture = topTexture;
+      (material as any).topTexture = sideTexture; // Используем side как fallback
       (material as any).sideTexture = sideTexture;
 
       return material;

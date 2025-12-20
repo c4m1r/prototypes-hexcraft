@@ -422,40 +422,82 @@ export class World {
 
   private unloadDistantChunks(playerChunkQ: number, playerChunkR: number): void {
     const unloadDistance = Math.max(this.renderDistance + 2, 7);
+    const keepDistance = this.renderDistance; // Расстояние зоны видимости
 
-    // Сначала удаляем явно дальние чанки.
+    // Функция проверки, находится ли чанк в зоне видимости
+    const isInRenderRange = (chunkQ: number, chunkR: number): boolean => {
+      const distance = Math.max(
+        Math.abs(chunkQ - playerChunkQ),
+        Math.abs(chunkR - playerChunkR)
+      );
+      return distance <= keepDistance;
+    };
+
+    // Функция проверки, есть ли соседи чанка в зоне видимости
+    const hasNeighborsInRange = (chunkQ: number, chunkR: number): boolean => {
+      // Проверяем 6 соседних чанков (гексагональная сетка)
+      const neighbors = [
+        { q: chunkQ + 1, r: chunkR },
+        { q: chunkQ - 1, r: chunkR },
+        { q: chunkQ, r: chunkR + 1 },
+        { q: chunkQ, r: chunkR - 1 },
+        { q: chunkQ + 1, r: chunkR - 1 },
+        { q: chunkQ - 1, r: chunkR + 1 }
+      ];
+
+      for (const neighbor of neighbors) {
+        const neighborKey = getChunkKey(neighbor.q, neighbor.r);
+        if (this.chunks.has(neighborKey)) {
+          // Если сосед в зоне видимости, этот чанк нужно сохранить
+          if (isInRenderRange(neighbor.q, neighbor.r)) {
+            return true;
+          }
+        }
+      }
+      return false;
+    };
+
+    // Сначала удаляем явно дальние чанки, но только если:
+    // 1. Они не в зоне видимости
+    // 2. У них нет соседей в зоне видимости
     const entries = Array.from(this.chunks.entries()).map(([key, chunk]) => {
       const distance = Math.max(
         Math.abs(chunk.position.q - playerChunkQ),
         Math.abs(chunk.position.r - playerChunkR)
       );
-      return { key, chunk, distance };
+      const inRange = isInRenderRange(chunk.position.q, chunk.position.r);
+      const hasNeighbors = hasNeighborsInRange(chunk.position.q, chunk.position.r);
+      return { key, chunk, distance, inRange, hasNeighbors };
     });
 
     entries
-      .filter(e => e.distance > unloadDistance)
+      .filter(e => e.distance > unloadDistance && !e.inRange && !e.hasNeighbors)
       .forEach(e => {
         this.removeChunkMeshes(e.key);
         this.chunks.delete(e.key);
       });
 
-    // Если после этого всё ещё превышаем лимит по количеству, удаляем самые дальние.
+    // Если после этого всё ещё превышаем лимит по количеству, удаляем самые дальние,
+    // но только те, которые не в зоне видимости и у которых нет соседей в зоне видимости
     if (this.chunks.size > this.maxLoadedChunks) {
-      const remaining = Array.from(this.chunks.entries()).map(([key, chunk]) => {
-        const distance = Math.max(
-          Math.abs(chunk.position.q - playerChunkQ),
-          Math.abs(chunk.position.r - playerChunkR)
-        );
-        return { key, distance };
-      });
-
-      remaining
+      const remaining = Array.from(this.chunks.entries())
+        .map(([key, chunk]) => {
+          const distance = Math.max(
+            Math.abs(chunk.position.q - playerChunkQ),
+            Math.abs(chunk.position.r - playerChunkR)
+          );
+          const inRange = isInRenderRange(chunk.position.q, chunk.position.r);
+          const hasNeighbors = hasNeighborsInRange(chunk.position.q, chunk.position.r);
+          return { key, distance, inRange, hasNeighbors };
+        })
+        .filter(e => !e.inRange && !e.hasNeighbors) // Удаляем только те, которые не в зоне и без соседей в зоне
         .sort((a, b) => b.distance - a.distance)
-        .slice(0, Math.max(0, this.chunks.size - this.maxLoadedChunks))
-        .forEach(e => {
-          this.removeChunkMeshes(e.key);
-          this.chunks.delete(e.key);
-        });
+        .slice(0, Math.max(0, this.chunks.size - this.maxLoadedChunks));
+
+      remaining.forEach(e => {
+        this.removeChunkMeshes(e.key);
+        this.chunks.delete(e.key);
+      });
     }
   }
 
