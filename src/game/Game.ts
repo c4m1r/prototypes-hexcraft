@@ -129,6 +129,14 @@ export class Game {
 
     this.dayNightCycle.update(Math.min(deltaTime, 0.1));
 
+    // Обновляем освещение для шейдер-материалов в режиме Modern
+    const ambientIntensity = this.ambientLight.intensity;
+    const directionalIntensity = this.directionalLight.intensity;
+    const ambientColor = new THREE.Color(0xffffff).multiplyScalar(ambientIntensity);
+    const directionalColor = new THREE.Color(0xffffff).multiplyScalar(directionalIntensity);
+    const directionalDirection = this.directionalLight.position.clone().normalize();
+    this.world.setLighting(ambientColor, directionalColor, directionalDirection);
+
     const targetedBlock = this.raycastManager.getTargetedBlock(this.camera);
     const worldDebug = this.world.getDebugInfo();
 

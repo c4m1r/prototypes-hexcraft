@@ -1,8 +1,9 @@
 import * as THREE from 'three';
 import { Chunk, Block, BLOCK_TYPES } from '../types/game';
 import { ChunkGenerator } from './ChunkGenerator';
-import { hexToWorld, getChunkKey, worldToChunk, createHexGeometry, worldToHex } from '../utils/hexUtils';
-import { GameSettings, DEFAULT_SETTINGS } from '../types/settings';
+import { hexToWorld, getChunkKey, worldToChunk, createHexGeometry, createHexGeometryWithUV, worldToHex } from '../utils/hexUtils';
+import { GameSettings, DEFAULT_SETTINGS, RenderingMode } from '../types/settings';
+import { TextureManager } from './TextureManager';
 
 interface ChunkMeshData {
   mesh: THREE.InstancedMesh;
@@ -31,6 +32,9 @@ export class World {
   private emergencyAttempts: number = 0;
   private stopEmergencyLogs: boolean = false;
   private fallbackInjected: boolean = false;
+  private renderingMode: RenderingMode = 'prototype';
+  private textureManager: TextureManager | null = null;
+  private animationTime: number = 0;
 
   constructor(scene: THREE.Scene, settings?: GameSettings) {
     this.scene = scene;
@@ -39,6 +43,7 @@ export class World {
     this.maxLoadedChunks = finalSettings.maxLoadedChunks;
     this.renderDistance = finalSettings.renderDistance;
     this.fogDensity = finalSettings.fogDensity;
+    this.renderingMode = finalSettings.renderingMode;
 
     // Чтобы избежать постоянного удаления/добавления чанков, гарантируем,
     // что лимит загруженных чанков покрывает радиус видимости.
@@ -52,23 +57,65 @@ export class World {
 
     this.generator = new ChunkGenerator(this.chunkSize);
     this.generatorSeed = this.generator.getSeed();
-    this.blockGeometry = createHexGeometry();
 
-    BLOCK_TYPES.forEach(blockType => {
-      const isLeaves = blockType.id === 'leaves';
-      this.materials.set(
-        blockType.id,
-        new THREE.MeshLambertMaterial({
-          color: blockType.color,
-          transparent: isLeaves,
-          opacity: isLeaves ? 0.75 : 1,
-          side: isLeaves ? THREE.DoubleSide : THREE.FrontSide
-        })
-      );
-    });
+    if (this.renderingMode === 'modern') {
+      this.blockGeometry = createHexGeometryWithUV();
+      this.textureManager = new TextureManager({
+        atlasSize: 320,
+        tileSize: 32,
+        rows: 4,
+        cols: 10
+      });
+      // Загружаем текстуру (путь будет обработан Vite)
+      const texturePath = new URL('./texutres.png', import.meta.url).href;
+      this.textureManager.loadAtlas(texturePath).then(() => {
+        this.initializeMaterials();
+      }).catch(err => {
+        console.error('[World] Ошибка загрузки текстур:', err);
+        this.renderingMode = 'prototype';
+        this.initializeMaterials();
+      });
+    } else {
+      this.blockGeometry = createHexGeometry();
+      this.initializeMaterials();
+    }
 
     this.createFogBarrier();
     this.updateFogDensity();
+  }
+
+  private initializeMaterials(): void {
+    BLOCK_TYPES.forEach(blockType => {
+      if (this.renderingMode === 'modern' && this.textureManager) {
+        const material = this.textureManager.createMaterial(blockType.id, this.animationTime);
+        if (material) {
+          this.materials.set(blockType.id, material);
+        } else {
+          // Fallback на цветной материал
+          const isLeaves = blockType.id === 'leaves';
+          this.materials.set(
+            blockType.id,
+            new THREE.MeshLambertMaterial({
+              color: blockType.color,
+              transparent: isLeaves,
+              opacity: isLeaves ? 0.75 : 1,
+              side: isLeaves ? THREE.DoubleSide : THREE.FrontSide
+            })
+          );
+        }
+      } else {
+        const isLeaves = blockType.id === 'leaves';
+        this.materials.set(
+          blockType.id,
+          new THREE.MeshLambertMaterial({
+            color: blockType.color,
+            transparent: isLeaves,
+            opacity: isLeaves ? 0.75 : 1,
+            side: isLeaves ? THREE.DoubleSide : THREE.FrontSide
+          })
+        );
+      }
+    });
   }
 
   initialize(): void {
@@ -134,19 +181,64 @@ export class World {
 
     this.unloadDistantChunks(playerChunk.q, playerChunk.r);
     this.updateFogBarrier(playerX, playerZ);
+
+    // Обновление анимации текстур для режима Modern
+    if (this.renderingMode === 'modern' && this.textureManager) {
+      this.animationTime += 0.016; // Примерно 60 FPS
+      this.textureManager.updateAnimation(0.016);
+      this.updateAnimatedMaterials();
+    }
+  }
+
+  private updateAnimatedMaterials(): void {
+    if (!this.textureManager) return;
+
+    const animatedBlocks = ['lava', 'water'];
+    animatedBlocks.forEach(blockId => {
+      const material = this.materials.get(blockId);
+      if (material) {
+        const newMaterial = this.textureManager!.createMaterial(blockId, this.animationTime);
+        if (newMaterial) {
+          // Для ShaderMaterial обновляем uniforms
+          if (material instanceof THREE.ShaderMaterial) {
+            const newShaderMaterial = newMaterial as THREE.ShaderMaterial;
+            if (newShaderMaterial.uniforms) {
+              material.uniforms.topTexture.value = newShaderMaterial.uniforms.topTexture.value;
+              material.uniforms.sideTexture.value = newShaderMaterial.uniforms.sideTexture.value;
+            }
+          } else if (material instanceof THREE.MeshLambertMaterial) {
+            // Для обычных материалов обновляем map
+            if (material.map) {
+              material.map.dispose();
+            }
+            material.map = (newMaterial as THREE.MeshLambertMaterial).map;
+          }
+          material.needsUpdate = true;
+        }
+      }
+    });
+  }
+
+  setLighting(ambientColor: THREE.Color, directionalColor: THREE.Color, directionalDirection: THREE.Vector3): void {
+    // Обновляем освещение для всех шейдер-материалов
+    this.materials.forEach(material => {
+      if (material instanceof THREE.ShaderMaterial && material.uniforms) {
+        if (material.uniforms.ambientLightColor) {
+          material.uniforms.ambientLightColor.value.copy(ambientColor);
+        }
+        if (material.uniforms.directionalLightColor) {
+          material.uniforms.directionalLightColor.value.copy(directionalColor);
+        }
+        if (material.uniforms.directionalLightDirection) {
+          material.uniforms.directionalLightDirection.value.copy(directionalDirection);
+        }
+      }
+    });
   }
 
   private loadChunk(chunkQ: number, chunkR: number): void {
     const key = getChunkKey(chunkQ, chunkR);
     if (this.chunks.has(key)) return;
-
-    if (this.chunks.size >= this.maxLoadedChunks) {
-      if (this.debugLogsLeft > 0) {
-        console.warn(`[World] Пропуск loadChunk key=${key}, достигнут лимит ${this.maxLoadedChunks}`);
-        this.debugLogsLeft -= 1;
-      }
-      return;
-    }
 
     const chunk = this.generator.generateChunk(chunkQ, chunkR);
     if (this.debugLogsLeft > 0) {
@@ -185,8 +277,14 @@ export class World {
     const chunkMeshMap = new Map<string, ChunkMeshData>();
 
     blocksByType.forEach((blocks, type) => {
-      const material = this.materials.get(type);
+      let material = this.materials.get(type);
       if (!material) return;
+
+      // TODO: для modern режима заменить материалы на текстурные,
+      // когда появятся координаты в атласе texutres.png.
+      if (this.renderingMode === 'modern') {
+        // пока используем существующие цветные материалы как fallback
+      }
 
       const mesh = new THREE.InstancedMesh(this.blockGeometry, material, blocks.length);
       // Инстансы расположены далеко от (0,0,0), без этого boundingSphere отсечет их.

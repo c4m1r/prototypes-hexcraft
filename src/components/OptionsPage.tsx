@@ -134,6 +134,23 @@ export function OptionsPage({ onBack, onSave, currentSettings }: OptionsPageProp
               </div>
             </label>
           </div>
+
+          <div className="bg-gray-900 p-6 rounded-lg border border-white/20">
+            <label className="block mb-4">
+              <div className="text-lg font-semibold mb-2">Rendering Mode</div>
+              <div className="text-sm text-gray-400 mb-3">
+                Prototype — цвета; Modern — текстуры из общего атласа
+              </div>
+              <select
+                value={settings.renderingMode}
+                onChange={(e) => setSettings({ ...settings, renderingMode: e.target.value as GameSettings['renderingMode'] })}
+                className="w-full bg-gray-800 border border-white/20 rounded-lg px-4 py-2 text-white"
+              >
+                <option value="prototype">Prototype (цвета)</option>
+                <option value="modern">Modern (атлас)</option>
+              </select>
+            </label>
+          </div>
         </div>
 
         <div className="flex gap-4 mt-12">

@@ -112,7 +112,7 @@ export class ChunkGenerator {
     if (biome === 'forest') {
       const treeChance = this.simpleNoise(q * 0.3, r * 0.3);
       if (treeChance > 0.7) {
-        const trunkHeight = 3 + Math.floor(this.simpleNoise(q * 0.7, r * 0.7) * 2);
+        const trunkHeight = 3 + Math.floor(this.simpleNoise(q * 0.7, r * 0.7) * 2) + 3;
         const baseY = height;
 
         for (let i = 0; i < trunkHeight; i++) {

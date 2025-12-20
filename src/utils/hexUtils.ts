@@ -46,6 +46,106 @@ export function createHexGeometry(): THREE.CylinderGeometry {
   return new THREE.CylinderGeometry(HEX_SIZE, HEX_SIZE, HEX_HEIGHT, 6);
 }
 
+export function createHexGeometryWithUV(): THREE.BufferGeometry {
+  const geometry = new THREE.BufferGeometry();
+  const vertices: number[] = [];
+  const normals: number[] = [];
+  const uvs: number[] = [];
+  const indices: number[] = [];
+
+  const radius = HEX_SIZE;
+  const height = HEX_HEIGHT;
+  const segments = 6;
+
+  // Верхняя грань (верхняя текстура)
+  const topCenterIndex = vertices.length / 3;
+  vertices.push(0, height / 2, 0);
+  normals.push(0, 1, 0);
+  uvs.push(0.5, 0.5); // Центр верхней текстуры
+
+  for (let i = 0; i <= segments; i++) {
+    const angle = (i / segments) * Math.PI * 2;
+    const x = Math.cos(angle) * radius;
+    const z = Math.sin(angle) * radius;
+    vertices.push(x, height / 2, z);
+    normals.push(0, 1, 0);
+    // UV для верхней грани (центр в 0.5, 0.5)
+    const u = 0.5 + Math.cos(angle) * 0.5;
+    const v = 0.5 + Math.sin(angle) * 0.5;
+    uvs.push(u, v);
+  }
+
+  // Индексы для верхней грани
+  for (let i = 0; i < segments; i++) {
+    indices.push(topCenterIndex, topCenterIndex + i + 1, topCenterIndex + i + 2);
+  }
+
+  // Нижняя грань (нижняя текстура, используем ту же что и боковая)
+  const bottomCenterIndex = vertices.length / 3;
+  vertices.push(0, -height / 2, 0);
+  normals.push(0, -1, 0);
+  uvs.push(0.5, 0.5);
+
+  for (let i = 0; i <= segments; i++) {
+    const angle = (i / segments) * Math.PI * 2;
+    const x = Math.cos(angle) * radius;
+    const z = Math.sin(angle) * radius;
+    vertices.push(x, -height / 2, z);
+    normals.push(0, -1, 0);
+    const u = 0.5 + Math.cos(angle) * 0.5;
+    const v = 0.5 + Math.sin(angle) * 0.5;
+    uvs.push(u, v);
+  }
+
+  // Индексы для нижней грани
+  for (let i = 0; i < segments; i++) {
+    indices.push(bottomCenterIndex, bottomCenterIndex + i + 2, bottomCenterIndex + i + 1);
+  }
+
+  // Боковые грани (боковая текстура)
+  const sideStartIndex = vertices.length / 3;
+  for (let i = 0; i <= segments; i++) {
+    const angle = (i / segments) * Math.PI * 2;
+    const x = Math.cos(angle) * radius;
+    const z = Math.sin(angle) * radius;
+    const nextAngle = ((i + 1) % (segments + 1)) / segments * Math.PI * 2;
+    const nextX = Math.cos(nextAngle) * radius;
+    const nextZ = Math.sin(nextAngle) * radius;
+
+    // Верхние вершины
+    vertices.push(x, height / 2, z);
+    normals.push(Math.cos(angle), 0, Math.sin(angle));
+    uvs.push(i / segments, 1);
+
+    // Нижние вершины
+    vertices.push(x, -height / 2, z);
+    normals.push(Math.cos(angle), 0, Math.sin(angle));
+    uvs.push(i / segments, 0);
+
+    // Верхние вершины следующей грани
+    vertices.push(nextX, height / 2, nextZ);
+    normals.push(Math.cos(nextAngle), 0, Math.sin(nextAngle));
+    uvs.push((i + 1) / segments, 1);
+
+    // Нижние вершины следующей грани
+    vertices.push(nextX, -height / 2, nextZ);
+    normals.push(Math.cos(nextAngle), 0, Math.sin(nextAngle));
+    uvs.push((i + 1) / segments, 0);
+
+    const baseIdx = sideStartIndex + i * 4;
+    indices.push(baseIdx, baseIdx + 1, baseIdx + 2);
+    indices.push(baseIdx + 1, baseIdx + 3, baseIdx + 2);
+  }
+
+  geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
+  geometry.setAttribute('normal', new THREE.Float32BufferAttribute(normals, 3));
+  geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
+  geometry.setIndex(indices);
+  geometry.computeBoundingSphere();
+
+  return geometry;
+}
+
 export function getChunkKey(q: number, r: number): string {
   return `${q},${r}`;
 }

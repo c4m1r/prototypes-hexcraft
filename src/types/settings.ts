@@ -1,9 +1,12 @@
+export type RenderingMode = 'prototype' | 'modern';
+
 export interface GameSettings {
   renderDistance: number;
   fogDensity: number;
   biomeSize: number;
   chunkSize: number;
   maxLoadedChunks: number;
+  renderingMode: RenderingMode;
 }
 
 export const DEFAULT_SETTINGS: GameSettings = {
@@ -11,7 +14,8 @@ export const DEFAULT_SETTINGS: GameSettings = {
   fogDensity: 1,
   biomeSize: 1,
   chunkSize: 14,
-  maxLoadedChunks: 15
+  maxLoadedChunks: 15,
+  renderingMode: 'prototype'
 };
 
 export const SETTINGS_CONSTRAINTS = {
