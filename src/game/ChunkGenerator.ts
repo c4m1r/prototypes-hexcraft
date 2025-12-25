@@ -9,15 +9,123 @@ interface BiomeConfig {
   heightVariation: number;
 }
 
+export interface GenerationConfig {
+  // Общие параметры
+  enableOreGeneration: boolean;
+  enableCaves: boolean;
+  enableLiquids: boolean;
+  enableStructures: boolean;
+  
+  // Параметры руды
+  oreGeneration: {
+    enabled: boolean;
+    bronzeChance: number; // Базовая вероятность бронзы на самом глубоком уровне (0-1)
+    silverChance: number; // Базовая вероятность серебра на самом глубоком уровне (0-1)
+    goldChance: number;   // Базовая вероятность золота на самом глубоком уровне (0-1)
+    minDepthFactor: number; // Минимальный фактор глубины (0-1), влияет на вероятность на верхних уровнях
+  };
+  
+  // Параметры пещер
+  caves: {
+    enabled: boolean;
+    threshold: number; // Порог генерации пещер (0-1), меньше = больше пещер
+    depthFactor: number; // Влияние глубины на генерацию пещер (0-1)
+    expansionRadius: number; // Радиус расширения камер пещер
+  };
+  
+  // Параметры жидкостей
+  liquids: {
+    enabled: boolean;
+    waterChance: number; // Вероятность генерации воды в полостях (0-1)
+    lavaChance: number;  // Вероятность генерации лавы в вулканических зонах (0-1)
+  };
+  
+  // Параметры структур
+  structures: {
+    enabled: boolean;
+    trees: {
+      enabled: boolean;
+      chance: number; // Вероятность генерации дерева (0-1)
+      minHeight: number; // Минимальная высота ствола
+      maxHeight: number; // Максимальная высота ствола
+      canopyRadius: number; // Радиус лиственного навеса
+    };
+    mushrooms: {
+      enabled: boolean;
+      chance: number; // Вероятность генерации гриба (0-1)
+    };
+  };
+  
+  // Параметры оптимизации
+  optimization: {
+    maxBlocksPerChunk: number; // Максимальное количество блоков в чанке перед пропуском генерации
+    skipFloatingBlockValidation: boolean; // Пропустить валидацию плавающих блоков (ускоряет генерацию)
+  };
+}
+
+const DEFAULT_GENERATION_CONFIG: GenerationConfig = {
+  enableOreGeneration: true,
+  enableCaves: false, // По умолчанию отключено для производительности
+  enableLiquids: true,
+  enableStructures: true,
+  
+  oreGeneration: {
+    enabled: true,
+    bronzeChance: 0.40,
+    silverChance: 0.20,
+    goldChance: 0.15,
+    minDepthFactor: 0.1
+  },
+  
+  caves: {
+    enabled: false,
+    threshold: 0.4,
+    depthFactor: 0.2,
+    expansionRadius: 1
+  },
+  
+  liquids: {
+    enabled: true,
+    waterChance: 0.3,
+    lavaChance: 0.05
+  },
+  
+  structures: {
+    enabled: true,
+    trees: {
+      enabled: true,
+      chance: 0.12, // 12% вероятность (было 0.88 threshold, значит 12% шанс)
+      minHeight: 4,
+      maxHeight: 7,
+      canopyRadius: 2
+    },
+    mushrooms: {
+      enabled: true,
+      chance: 0.07 // 7% вероятность (было 0.93 threshold, значит 7% шанс)
+    }
+  },
+  
+  optimization: {
+    maxBlocksPerChunk: 50000, // Максимум блоков перед пропуском генерации
+    skipFloatingBlockValidation: false
+  }
+};
+
 export class ChunkGenerator {
   private chunkSize: number;
   private seed: number;
   private biomeConfigs: Map<string, BiomeConfig> = new Map();
   private readonly BIOME_SIZE = 72; // Размер биома 72x72 зоны
+  private config: GenerationConfig;
 
-  constructor(chunkSize: number = 14, seed: number = Math.floor(Math.random() * 1_000_000_000)) {
+  constructor(
+    chunkSize: number = 14, 
+    seed: number = Math.floor(Math.random() * 1_000_000_000),
+    config?: Partial<GenerationConfig>
+  ) {
     this.chunkSize = chunkSize;
     this.seed = seed;
+    this.config = { ...DEFAULT_GENERATION_CONFIG, ...config };
     this.setupBiomeConfigs();
   }
 
@@ -221,73 +329,73 @@ export class ChunkGenerator {
     // ============================================
     // Руда генерируется только в зоне каменных блоков (от y = 0 до baseStoneDepth)
     // Вероятность увеличивается с глубиной (чем меньше y, тем глубже)
-    // Самый первый низкий блок (y = 0): 40% бронза, 20% серебро, 15% золото
-    for (let q = 0; q < this.chunkSize; q++) {
-      for (let r = 0; r < this.chunkSize; r++) {
-        const worldQ = offsetQ + q;
-        const worldR = offsetR + r;
-        
-        // Генерируем руду только в каменных блоках (от y = 0 до baseStoneDepth)
-        for (let y = 0; y <= baseStoneDepth && y < maxY; y++) {
-          const blockKey = `${worldQ},${worldR},${y}`;
-          const block = blockMap.get(blockKey);
+    if (this.config.enableOreGeneration && this.config.oreGeneration.enabled) {
+      for (let q = 0; q < this.chunkSize; q++) {
+        for (let r = 0; r < this.chunkSize; r++) {
+          const worldQ = offsetQ + q;
+          const worldR = offsetR + r;
           
-          if (!block || block.type !== 'stone') continue;
-          
-          // Вычисляем глубину от верхней границы каменного слоя
-          // Чем глубже блок (меньше y), тем выше вероятность руды
-          // y = 0 - самый глубокий каменный блок (максимальная вероятность)
-          // y = baseStoneDepth - самый верхний каменный блок (минимальная вероятность)
-          const maxDepth = baseStoneDepth;
-          
-          // depthFactor: 1.0 на y=0 (самый глубокий), 0.0 на y=baseStoneDepth (самый верхний)
-          const depthFactor = (maxDepth - y) / maxDepth;
-          
-          // Базовые вероятности для самого глубокого блока (y = 0)
-          // 40% бронза, 20% серебро, 15% золото = 75% общая вероятность руды
-          const baseBronzeChance = 0.40; // 40% бронзы на самом глубоком уровне
-          const baseSilverChance = 0.20; // 20% серебра на самом глубоком уровне
-          const baseGoldChance = 0.15;  // 15% золота на самом глубоком уровне
-          const baseOreChance = baseBronzeChance + baseSilverChance + baseGoldChance; // 75% общая вероятность
-          
-          // Вероятность руды увеличивается линейно с глубиной
-          // На y = 0: вероятность = baseOreChance (75% - максимум)
-          // На y = baseStoneDepth: вероятность = baseOreChance * 0.1 (7.5% - минимум)
-          const oreChance = baseOreChance * (0.1 + 0.9 * depthFactor);
-          
-          // Вероятности для каждого типа руды также увеличиваются с глубиной
-          const bronzeChance = baseBronzeChance * (0.1 + 0.9 * depthFactor);
-          const silverChance = baseSilverChance * (0.1 + 0.9 * depthFactor);
-          const goldChance = baseGoldChance * (0.1 + 0.9 * depthFactor);
-          
-          // Генерируем случайное число для определения руды
-          const oreNoise = this.simpleNoise(worldQ * 0.1, worldR * 0.1 + y * 0.2);
-          
-          if (oreNoise <= oreChance) {
-            // Определяем тип руды на основе вероятностей
-            // Вероятности пропорциональны глубине: бронза > серебро > золото
-            let oreType = 'stone'; // По умолчанию остается камень
+          // Генерируем руду только в каменных блоках (от y = 0 до baseStoneDepth)
+          for (let y = 0; y <= baseStoneDepth && y < maxY; y++) {
+            const blockKey = `${worldQ},${worldR},${y}`;
+            const block = blockMap.get(blockKey);
             
-            // Нормализуем шум относительно общей вероятности руды
-            const normalizedOreNoise = oreNoise / oreChance;
+            if (!block || block.type !== 'stone') continue;
             
-            // Распределяем типы руды пропорционально их вероятностям
-            const bronzeRatio = bronzeChance / oreChance;
-            const silverRatio = silverChance / oreChance;
-            const goldRatio = goldChance / oreChance;
+            // Вычисляем глубину от верхней границы каменного слоя
+            // Чем глубже блок (меньше y), тем выше вероятность руды
+            // y = 0 - самый глубокий каменный блок (максимальная вероятность)
+            // y = baseStoneDepth - самый верхний каменный блок (минимальная вероятность)
+            const maxDepth = baseStoneDepth;
             
-            if (normalizedOreNoise <= bronzeRatio) {
-              // Бронза (самая частая)
-              oreType = 'bronze';
-            } else if (normalizedOreNoise <= bronzeRatio + silverRatio) {
-              // Серебро (средняя частота)
-              oreType = 'silver';
-            } else {
-              // Золото (самая редкая)
-              oreType = 'gold';
+            // depthFactor: 1.0 на y=0 (самый глубокий), 0.0 на y=baseStoneDepth (самый верхний)
+            const depthFactor = (maxDepth - y) / maxDepth;
+            
+            // Используем параметры из конфигурации
+            const baseBronzeChance = this.config.oreGeneration.bronzeChance;
+            const baseSilverChance = this.config.oreGeneration.silverChance;
+            const baseGoldChance = this.config.oreGeneration.goldChance;
+            const baseOreChance = baseBronzeChance + baseSilverChance + baseGoldChance;
+            const minDepthFactor = this.config.oreGeneration.minDepthFactor;
+            
+            // Вероятность руды увеличивается линейно с глубиной
+            // На y = 0: вероятность = baseOreChance (максимум)
+            // На y = baseStoneDepth: вероятность = baseOreChance * minDepthFactor (минимум)
+            const oreChance = baseOreChance * (minDepthFactor + (1 - minDepthFactor) * depthFactor);
+            
+            // Вероятности для каждого типа руды также увеличиваются с глубиной
+            const bronzeChance = baseBronzeChance * (minDepthFactor + (1 - minDepthFactor) * depthFactor);
+            const silverChance = baseSilverChance * (minDepthFactor + (1 - minDepthFactor) * depthFactor);
+            const goldChance = baseGoldChance * (minDepthFactor + (1 - minDepthFactor) * depthFactor);
+            
+            // Генерируем случайное число для определения руды
+            const oreNoise = this.simpleNoise(worldQ * 0.1, worldR * 0.1 + y * 0.2);
+            
+            if (oreNoise <= oreChance) {
+              // Определяем тип руды на основе вероятностей
+              // Вероятности пропорциональны глубине: бронза > серебро > золото
+              let oreType = 'stone'; // По умолчанию остается камень
+              
+              // Нормализуем шум относительно общей вероятности руды
+              const normalizedOreNoise = oreNoise / oreChance;
+              
+              // Распределяем типы руды пропорционально их вероятностям
+              const bronzeRatio = bronzeChance / oreChance;
+              const silverRatio = silverChance / oreChance;
+              
+              if (normalizedOreNoise <= bronzeRatio) {
+                // Бронза (самая частая)
+                oreType = 'bronze';
+              } else if (normalizedOreNoise <= bronzeRatio + silverRatio) {
+                // Серебро (средняя частота)
+                oreType = 'silver';
+              } else {
+                // Золото (самая редкая)
+                oreType = 'gold';
+              }
+              
+              block.type = oreType;
             }
-            
-            block.type = oreType;
           }
         }
       }
@@ -370,42 +478,115 @@ export class ChunkGenerator {
     // ============================================
     // Удаляем блоки, которые не имеют опоры снизу
     // Исключаем только блоки на y=0 (они всегда имеют опору)
-    const blocksToRemove: Block[] = [];
-    const passableBlocks = new Set(['water', 'lava', 'leaves', 'ice']); // Эти блоки могут плавать
-    
-    for (const block of blocks) {
-      const y = block.position.y;
+    if (!this.config.optimization.skipFloatingBlockValidation) {
+      const blocksToRemove: Block[] = [];
+      const passableBlocks = new Set(['water', 'lava', 'leaves', 'ice']); // Эти блоки могут плавать
       
-      // Блоки на y=0 всегда имеют опору
-      if (y <= 0) continue;
-      
-      // Проходимые блоки могут плавать
-      if (passableBlocks.has(block.type)) continue;
-      
-      // Проверяем есть ли блок снизу
-      const blockBelowKey = `${block.position.q},${block.position.r},${y - 1}`;
-      const blockBelow = finalBlockMap.get(blockBelowKey);
-      
-      // Если нет блока снизу - удаляем
-      if (!blockBelow) {
-        blocksToRemove.push(block);
+      for (const block of blocks) {
+        const y = block.position.y;
+        
+        // Блоки на y=0 всегда имеют опору
+        if (y <= 0) continue;
+        
+        // Проходимые блоки могут плавать
+        if (passableBlocks.has(block.type)) continue;
+        
+        // Проверяем есть ли блок снизу
+        const blockBelowKey = `${block.position.q},${block.position.r},${y - 1}`;
+        const blockBelow = finalBlockMap.get(blockBelowKey);
+        
+        // Если нет блока снизу - удаляем
+        if (!blockBelow) {
+          blocksToRemove.push(block);
+        }
       }
+      
+      // Удаляем плавающие блоки
+      blocksToRemove.forEach(block => {
+        const index = blocks.indexOf(block);
+        if (index !== -1) {
+          blocks.splice(index, 1);
+          finalBlockMap.delete(`${block.position.q},${block.position.r},${block.position.y}`);
+        }
+      });
     }
-    
-    // Удаляем плавающие блоки
-    blocksToRemove.forEach(block => {
-      const index = blocks.indexOf(block);
-      if (index !== -1) {
-        blocks.splice(index, 1);
-        finalBlockMap.delete(`${block.position.q},${block.position.r},${block.position.y}`);
-      }
-    });
 
     // Пересобираем финальный blockMap после валидации
     const validatedBlockMap = new Map<string, Block>();
     blocks.forEach(block => {
       validatedBlockMap.set(`${block.position.q},${block.position.r},${block.position.y}`, block);
     });
+
+    // ============================================
+    // ОПТИМИЗАЦИЯ: Предвычисление карты высот для быстрого доступа
+    // ============================================
+    const chunkHeightMap = new Map<string, number>(); // Ключ: "q,r" -> максимальная высота непроходимого блока
+    const passableTypes = new Set(['water', 'lava', 'leaves', 'ice']);
+    
+    // Вычисляем максимальную высоту непроходимого блока для каждой позиции (q, r)
+    for (const block of blocks) {
+      const posKey = `${block.position.q},${block.position.r}`;
+      if (!passableTypes.has(block.type)) {
+        const currentHeight = chunkHeightMap.get(posKey) || -1;
+        if (block.position.y > currentHeight) {
+          chunkHeightMap.set(posKey, block.position.y);
+        }
+      }
+    }
+
+    // ============================================
+    // ОПТИМИЗАЦИЯ: Предвычисление видимости блоков
+    // ============================================
+    // Вычисляем видимость блоков при генерации, чтобы не делать это при создании мешей
+    const visibleBlocksSet = new Set<string>();
+    const alwaysVisibleTypes = new Set(['water', 'lava', 'ice', 'leaves']);
+    
+    // Шесть соседей в плоскости для гексагональной сетки
+    const hexNeighbors = [
+      { q: 1, r: 0 },
+      { q: -1, r: 0 },
+      { q: 0, r: 1 },
+      { q: 0, r: -1 },
+      { q: 1, r: -1 },
+      { q: -1, r: 1 }
+    ];
+    
+    for (const block of blocks) {
+      const blockKey = `${block.position.q},${block.position.r},${block.position.y}`;
+      
+      // Жидкости и листва всегда видимы
+      if (alwaysVisibleTypes.has(block.type)) {
+        visibleBlocksSet.add(blockKey);
+        continue;
+      }
+      
+      // Проверяем соседей только в текущем чанке (соседние чанки проверятся при создании мешей)
+      let hasVisibleFace = false;
+      
+      // Проверяем верх и низ
+      const topKey = `${block.position.q},${block.position.r},${block.position.y + 1}`;
+      const bottomKey = `${block.position.q},${block.position.r},${block.position.y - 1}`;
+      if (!validatedBlockMap.has(topKey) || !validatedBlockMap.has(bottomKey)) {
+        hasVisibleFace = true;
+      }
+      
+      // Проверяем соседей в плоскости
+      if (!hasVisibleFace) {
+        for (const neighbor of hexNeighbors) {
+          const neighborQ = block.position.q + neighbor.q;
+          const neighborR = block.position.r + neighbor.r;
+          const neighborKey = `${neighborQ},${neighborR},${block.position.y}`;
+          if (!validatedBlockMap.has(neighborKey)) {
+            hasVisibleFace = true;
+            break;
+          }
+        }
+      }
+      
+      if (hasVisibleFace) {
+        visibleBlocksSet.add(blockKey);
+      }
+    }
 
     // Определяем основной биом чанка (центр)
     const centerBiome = biomeMap.get(`${Math.floor(this.chunkSize / 2)},${Math.floor(this.chunkSize / 2)}`) || 'grassland';
@@ -414,7 +595,9 @@ export class ChunkGenerator {
       position: { q: chunkQ, r: chunkR },
       blocks,
       blockMap: validatedBlockMap,
-      biome: centerBiome
+      biome: centerBiome,
+      heightMap: chunkHeightMap,
+      visibleBlocks: visibleBlocksSet
     };
   }
 
@@ -844,15 +1027,17 @@ export class ChunkGenerator {
         if (structureMap.has(structureKey)) continue;
 
         // Деревья только в биоме луга на блоках травы
-        if (biome === 'grassland') {
+        if (biome === 'grassland' && this.config.enableStructures && this.config.structures.enabled && this.config.structures.trees.enabled) {
           const surfaceBlockKey = `${worldQ},${worldR},${surfaceHeight}`;
           const surfaceBlock = blockMap.get(surfaceBlockKey);
           
           if (surfaceBlock && surfaceBlock.type === 'grass') {
             const treeNoise = this.simpleNoise(worldQ * 0.1, worldR * 0.1);
-            if (treeNoise > 0.88) {
-              // Генерируем дерево
-              const trunkHeight = 4 + Math.floor(this.simpleNoise(worldQ * 0.2, worldR * 0.2) * 3);
+            // Используем параметр chance из конфигурации (инвертируем, так как было > 0.88, значит шанс 12%)
+            if (treeNoise > (1 - this.config.structures.trees.chance)) {
+              // Генерируем дерево с параметрами из конфигурации
+              const heightRange = this.config.structures.trees.maxHeight - this.config.structures.trees.minHeight;
+              const trunkHeight = this.config.structures.trees.minHeight + Math.floor(this.simpleNoise(worldQ * 0.2, worldR * 0.2) * heightRange);
               
               // Деревянный ствол
               for (let i = 1; i <= trunkHeight && surfaceHeight + i < maxY; i++) {
@@ -868,9 +1053,9 @@ export class ChunkGenerator {
                 }
               }
               
-              // Лиственный навес
+              // Лиственный навес с радиусом из конфигурации
               const canopyY = surfaceHeight + trunkHeight;
-              const canopyRadius = 2;
+              const canopyRadius = this.config.structures.trees.canopyRadius;
               for (let dq = -canopyRadius; dq <= canopyRadius; dq++) {
                 for (let dr = -canopyRadius; dr <= canopyRadius; dr++) {
                   const dist = Math.sqrt(dq * dq + dr * dr);
@@ -897,11 +1082,14 @@ export class ChunkGenerator {
           }
           
           // Грибы (2D спрайты - просто отмечаем позицию, рендеринг обрабатывается в другом месте)
-          const mushroomNoise = this.simpleNoise(worldQ * 0.15, worldR * 0.15);
-          if (mushroomNoise > 0.93 && surfaceBlock && surfaceBlock.type === 'grass') {
-            // Гриб рендерится как 2D спрайт, не занимает 3D пространство
-            // Просто отмечаем позицию для системы рендеринга
-            structureMap.add(structureKey);
+          if (this.config.structures.mushrooms.enabled) {
+            const mushroomNoise = this.simpleNoise(worldQ * 0.15, worldR * 0.15);
+            // Используем параметр chance из конфигурации (инвертируем, так как было > 0.93, значит шанс 7%)
+            if (mushroomNoise > (1 - this.config.structures.mushrooms.chance) && surfaceBlock && surfaceBlock.type === 'grass') {
+              // Гриб рендерится как 2D спрайт, не занимает 3D пространство
+              // Просто отмечаем позицию для системы рендеринга
+              structureMap.add(structureKey);
+            }
           }
         }
         

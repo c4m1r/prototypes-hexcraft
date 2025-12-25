@@ -37,6 +37,13 @@ export class Game {
   private hunger: number = 100;
   private staminaDrainAccumulator: number = 0;
   private staminaRegenAccumulator: number = 0;
+  private cachedLighting?: {
+    ambientIntensity: number;
+    directionalIntensity: number;
+    directionalX: number;
+    directionalY: number;
+    directionalZ: number;
+  };
 
   constructor(canvas: HTMLCanvasElement, onStateChange?: (state: GameState) => void, settings?: GameSettings) {
     this.onStateChange = onStateChange;
@@ -141,13 +148,45 @@ export class Game {
 
     this.dayNightCycle.update(Math.min(deltaTime, 0.1));
 
-    // Обновляем освещение для шейдер-материалов в режиме Modern
+    // ОПТИМИЗАЦИЯ: Обновляем освещение только если оно изменилось
+    // Кешируем предыдущие значения для сравнения
+    if (!this.cachedLighting) {
+      this.cachedLighting = {
+        ambientIntensity: -1,
+        directionalIntensity: -1,
+        directionalX: 0,
+        directionalY: 0,
+        directionalZ: 0
+      };
+    }
+    
     const ambientIntensity = this.ambientLight.intensity;
     const directionalIntensity = this.directionalLight.intensity;
-    const ambientColor = new THREE.Color(0xffffff).multiplyScalar(ambientIntensity);
-    const directionalColor = new THREE.Color(0xffffff).multiplyScalar(directionalIntensity);
-    const directionalDirection = this.directionalLight.position.clone().normalize();
-    this.world.setLighting(ambientColor, directionalColor, directionalDirection);
+    const directionalPos = this.directionalLight.position;
+    
+    // Проверяем, изменилось ли освещение
+    const lightingChanged = 
+      this.cachedLighting.ambientIntensity !== ambientIntensity ||
+      this.cachedLighting.directionalIntensity !== directionalIntensity ||
+      Math.abs(this.cachedLighting.directionalX - directionalPos.x) > 0.01 ||
+      Math.abs(this.cachedLighting.directionalY - directionalPos.y) > 0.01 ||
+      Math.abs(this.cachedLighting.directionalZ - directionalPos.z) > 0.01;
+    
+    if (lightingChanged) {
+      const ambientColor = new THREE.Color(0xffffff).multiplyScalar(ambientIntensity);
+      const directionalColor = new THREE.Color(0xffffff).multiplyScalar(directionalIntensity);
+      const directionalDirection = directionalPos.clone().normalize();
+      this.world.setLighting(ambientColor, directionalColor, directionalDirection);
+      
+      // Обновляем кеш
+      this.cachedLighting = {
+        ambientIntensity,
+        directionalIntensity,
+        directionalX: directionalPos.x,
+        directionalY: directionalPos.y,
+        directionalZ: directionalPos.z
+      };
+    }
 
     const targetedBlock = this.raycastManager.getTargetedBlock(this.camera);
     const worldDebug = this.world.getDebugInfo();

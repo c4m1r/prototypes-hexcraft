@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { World } from './World';
 import { Block, BLOCK_TYPES } from '../types/game';
-import { worldToHex, hexToWorld } from '../utils/hexUtils';
+import { worldToHex, hexToWorld, HEX_RADIUS, HEX_HEIGHT } from '../utils/hexUtils';
 
 export interface RaycastResult {
   block: Block;
@@ -24,8 +24,12 @@ export class RaycastManager {
   }
 
   private createHighlightMesh(): void {
-    // Увеличиваем высоту Selection Outline в 2 раза
-    const geometry = new THREE.EdgesGeometry(new THREE.CylinderGeometry(1, 1, 2, 6));
+    // Создаем геометрию Selection Outline точно такую же как у блоков
+    // Используем те же размеры и поворот на 30 градусов для pointy-top ориентации
+    const cylinderGeometry = new THREE.CylinderGeometry(HEX_RADIUS, HEX_RADIUS, HEX_HEIGHT, 6);
+    // Поворачиваем на 30 градусов вокруг оси Y для правильной ориентации pointy-top (как у блоков)
+    cylinderGeometry.rotateY(Math.PI / 6); // 30 градусов = π/6 радиан
+    const geometry = new THREE.EdgesGeometry(cylinderGeometry);
     const material = new THREE.LineBasicMaterial({ color: 0xffffff, linewidth: 2 });
     this.highlightMesh = new THREE.LineSegments(geometry, material);
     this.highlightMesh.visible = false;

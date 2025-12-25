@@ -15,6 +15,10 @@ export interface Chunk {
   blocks: Block[];
   blockMap: Map<string, Block>;
   biome: string;
+  // Оптимизация: карта высот для быстрого доступа
+  heightMap?: Map<string, number>; // Ключ: "q,r" -> максимальная высота непроходимого блока
+  // Оптимизация: предвычисленная видимость блоков
+  visibleBlocks?: Set<string>; // Ключи видимых блоков для быстрого доступа
 }
 
 export interface PlayerState {

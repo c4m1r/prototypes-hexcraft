@@ -332,9 +332,25 @@ export class World {
     // Оптимизация: фильтруем полностью скрытые блоки
     // Блоки, которые полностью закрыты со всех сторон, не отображаются
     // Исключение: жидкости и листва всегда отображаются
-    const visibleBlocks = chunk.blocks.filter(block => {
-      return this.isBlockVisible(block, chunk, key);
-    });
+    // Используем предвычисленную видимость из чанка, если доступна
+    let visibleBlocks: Block[];
+    if (chunk.visibleBlocks) {
+      // Используем предвычисленную видимость (быстрее)
+      visibleBlocks = chunk.blocks.filter(block => {
+        const blockKey = `${block.position.q},${block.position.r},${block.position.y}`;
+        return chunk.visibleBlocks!.has(blockKey);
+      });
+      
+      // Дополнительная проверка для граничных блоков (могут иметь соседей в других чанках)
+      visibleBlocks = visibleBlocks.filter(block => {
+        return this.isBlockVisibleOptimized(block, chunk, key);
+      });
+    } else {
+      // Fallback на старый метод (для обратной совместимости)
+      visibleBlocks = chunk.blocks.filter(block => {
+        return this.isBlockVisible(block, chunk, key);
+      });
+    }
     
     const blocksByType = new Map<string, Block[]>();
     visibleBlocks.forEach(block => {
@@ -396,6 +412,31 @@ export class World {
     this.chunkMeshes.set(key, chunkMeshMap);
   }
 
+  // Оптимизированная проверка видимости: проверяет только граничные блоки (соседи в других чанках)
+  private isBlockVisibleOptimized(block: Block, chunk: Chunk, chunkKey: string): boolean {
+    // Если блок уже помечен как видимый в чанке, проверяем только граничные случаи
+    const blockKey = `${block.position.q},${block.position.r},${block.position.y}`;
+    if (!chunk.visibleBlocks?.has(blockKey)) {
+      return false; // Блок уже помечен как невидимый
+    }
+    
+    // Проверяем только граничные блоки (могут иметь соседей в других чанках)
+    const localQ = block.position.q - Math.floor(block.position.q / this.chunkSize) * this.chunkSize;
+    const localR = block.position.r - Math.floor(block.position.r / this.chunkSize) * this.chunkSize;
+    
+    // Если блок не на границе чанка, он уже проверен
+    const isOnBorder = localQ === 0 || localQ === this.chunkSize - 1 || 
+                      localR === 0 || localR === this.chunkSize - 1 ||
+                      block.position.y === 0 || block.position.y === 31;
+    
+    if (!isOnBorder) {
+      return true; // Блок внутри чанка, уже проверен
+    }
+    
+    // Для граничных блоков проверяем соседние чанки
+    return this.isBlockVisible(block, chunk, chunkKey);
+  }
+
   // Проверка видимости блока: блок видим если хотя бы одна грань не закрыта
   private isBlockVisible(block: Block, chunk: Chunk, chunkKey: string): boolean {
     // Жидкости и листва всегда видимы
@@ -430,10 +471,10 @@ export class World {
       
       // Если сосед не найден в текущем чанке, проверяем соседние чанки
       if (!hasNeighbor) {
-        // Определяем в каком чанке находится сосед
-        const worldPos = hexToWorld(neighbor.q, neighbor.r, 0);
-        const neighborChunkPos = worldToChunk(worldPos.x, worldPos.z, this.chunkSize);
-        const neighborChunkKey = getChunkKey(neighborChunkPos.q, neighborChunkPos.r);
+        // Определяем в каком чанке находится сосед напрямую из hex координат
+        const neighborChunkQ = Math.floor(neighbor.q / this.chunkSize);
+        const neighborChunkR = Math.floor(neighbor.r / this.chunkSize);
+        const neighborChunkKey = getChunkKey(neighborChunkQ, neighborChunkR);
         
         // Если это другой чанк, проверяем его
         if (neighborChunkKey !== chunkKey) {
@@ -441,6 +482,8 @@ export class World {
           if (neighborChunk) {
             hasNeighbor = neighborChunk.blockMap.has(neighborKey);
           }
+          // Если соседний чанк не загружен, считаем что сосед отсутствует (грань видима)
+          // Это безопасно, так как когда чанк загрузится, меши будут пересозданы
         }
       }
       
@@ -451,6 +494,7 @@ export class World {
     }
 
     // Блок видим если хотя бы одна грань не закрыта
+    // Если все 8 соседей присутствуют, блок полностью скрыт и не должен рендериться
     return visibleFaces > 0;
   }
 
@@ -476,6 +520,20 @@ export class World {
       const chunk = this.chunks.get(key);
 
       if (chunk) {
+        // ОПТИМИЗАЦИЯ: Используем карту высот из чанка, если доступна
+        const posKey = `${q},${r}`;
+        if (chunk.heightMap && chunk.heightMap.has(posKey)) {
+          const heightY = chunk.heightMap.get(posKey)!;
+          const blockPos = hexToWorld(q, r, heightY);
+          const dist = Math.sqrt(Math.pow(blockPos.x - x, 2) + Math.pow(blockPos.z - z, 2));
+          
+          if (dist < 2) {
+            maxHeight = Math.max(maxHeight, blockPos.y + 0.5);
+            continue;
+          }
+        }
+        
+        // Fallback на старый метод (для обратной совместимости)
         // Check height at this q,r, пропускаем проходимые блоки
         for (let y = 32; y >= 0; y--) {
           if (chunk.blockMap.has(`${q},${r},${y}`)) {
@@ -763,15 +821,27 @@ export class World {
   }
 
   getHighestBlockAt(q: number, r: number): number | null {
-    // Находим чанк, в котором находится эта позиция
-    const worldPos = hexToWorld(q, r, 0);
-    const chunkPos = worldToChunk(worldPos.x, worldPos.z, this.chunkSize);
-    const key = getChunkKey(chunkPos.q, chunkPos.r);
+    // ОПТИМИЗАЦИЯ: Используем карту высот из чанка, если доступна
+    const chunkQ = Math.floor(q / this.chunkSize);
+    const chunkR = Math.floor(r / this.chunkSize);
+    const key = getChunkKey(chunkQ, chunkR);
     const chunk = this.chunks.get(key);
-
+    
     if (!chunk) {
       return null;
     }
+    
+    // Используем предвычисленную карту высот
+    if (chunk.heightMap) {
+      const posKey = `${q},${r}`;
+      const heightY = chunk.heightMap.get(posKey);
+      if (heightY !== undefined) {
+        const blockPos = hexToWorld(q, r, heightY);
+        return blockPos.y;
+      }
+    }
+    
+    // Fallback на старый метод (для обратной совместимости)
 
     // Ищем самый высокий блок в этой позиции (не считая проходимые блоки)
     let highestY = -1;
