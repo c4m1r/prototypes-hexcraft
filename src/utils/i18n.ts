@@ -134,7 +134,7 @@ const translations: Record<Language, Translations> = {
     mainMenu: {
       newGame: 'Новая игра',
       loadGame: 'Загрузить игру',
-      coop: 'Кооператив',
+      coop: 'Вылазки',
       options: 'Настройки',
       about: 'О игре'
     },
@@ -251,7 +251,7 @@ const translations: Record<Language, Translations> = {
     mainMenu: {
       newGame: 'New Game',
       loadGame: 'Load Game',
-      coop: 'Co-op',
+      coop: 'Incursions',
       options: 'Options',
       about: 'About'
     },
@@ -368,7 +368,7 @@ const translations: Record<Language, Translations> = {
     mainMenu: {
       newGame: 'Nuevo Juego',
       loadGame: 'Cargar Juego',
-      coop: 'Cooperativo',
+      coop: 'Incursiones',
       options: 'Opciones',
       about: 'Acerca de'
     },
@@ -485,7 +485,7 @@ const translations: Record<Language, Translations> = {
     mainMenu: {
       newGame: 'Neues Spiel',
       loadGame: 'Spiel Laden',
-      coop: 'Kooperativ',
+      coop: 'Einfälle',
       options: 'Einstellungen',
       about: 'Über'
     },
@@ -602,7 +602,7 @@ const translations: Record<Language, Translations> = {
     mainMenu: {
       newGame: '新游戏',
       loadGame: '加载游戏',
-      coop: '合作',
+      coop: '突袭',
       options: '设置',
       about: '关于'
     },
@@ -719,7 +719,7 @@ const translations: Record<Language, Translations> = {
     mainMenu: {
       newGame: '새 게임',
       loadGame: '게임 불러오기',
-      coop: '협동',
+      coop: '습격',
       options: '설정',
       about: '정보'
     },
@@ -836,7 +836,7 @@ const translations: Record<Language, Translations> = {
     mainMenu: {
       newGame: '新しいゲーム',
       loadGame: 'ゲームを読み込む',
-      coop: '協力',
+      coop: '襲撃',
       options: '設定',
       about: 'について'
     },
