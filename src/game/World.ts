@@ -35,6 +35,10 @@ export class World {
   private renderingMode: RenderingMode = 'prototype';
   private textureManager: TextureManager | null = null;
   private animationTime: number = 0;
+  
+  // Система очереди генерации чанков
+  private chunkGenerationQueue: Array<{ q: number; r: number; priority: number }> = [];
+  private isGenerating: boolean = false;
 
   constructor(scene: THREE.Scene, settings?: GameSettings) {
     this.scene = scene;
@@ -122,15 +126,20 @@ export class World {
       `[World] init seed=${this.generatorSeed} chunkSize=${this.chunkSize} renderDistance=${this.renderDistance} maxLoaded=${this.maxLoadedChunks}`
     );
     this.initialized = true;
-    // При старте генерируем ТОЛЬКО центральный чанк (0,0)
-    // Остальные чанки будут генерироваться в фоне после размещения игрока
-    // НЕ вызываем loadChunk здесь - это будет сделано асинхронно через initializeAsync
+    // НЕ генерируем чанки здесь - это будет сделано через initializeAsync
   }
 
   async initializeAsync(): Promise<void> {
-    // Асинхронная инициализация первого чанка (0,0)
-    // Этот метод должен быть вызван ПОСЛЕ показа экрана загрузки
-    await this.loadChunkAsync(0, 0);
+    // КРИТИЧНО: Генерируем чанк (0,0) полностью перед добавлением в сцену
+    // Это соответствует стартовому контракту
+    await new Promise<void>(resolve => requestAnimationFrame(() => resolve()));
+    
+    const chunk = this.generator.generateChunk(0, 0);
+    const key = getChunkKey(0, 0);
+    
+    this.chunks.set(key, chunk);
+    this.loadAttempts += 1;
+    this.createChunkMeshes(chunk);
 
     if (this.chunks.size === 0 && this.debugLogsLeft > 0) {
       console.error('[World] После initializeAsync чанки не загружены, size=0');
@@ -138,86 +147,49 @@ export class World {
     }
   }
 
+  // КРИТИЧНО: update() может только запрашивать чанки, но не генерировать их
   update(playerX: number, playerZ: number): void {
-    // Проверка времени выполнения для предотвращения блокировки UI
-    const frameStartTime = performance.now();
-    const maxFrameTime = 8; // Максимум 8мс на кадр (оставляем запас до 16мс)
-    
     const playerChunk = worldToChunk(playerX, playerZ, this.chunkSize);
 
     if (this.chunks.size === 0) {
-      console.warn('[World] Нет загруженных чанков, принудительная загрузка вокруг игрока');
+      console.warn('[World] Нет загруженных чанков');
       if (this.emergencyAttempts < this.maxEmergencyAttempts) {
-        this.forceLoadAround(playerChunk.q, playerChunk.r);
+        // Запрашиваем чанки вокруг игрока с высоким приоритетом
+        for (let q = playerChunk.q - 1; q <= playerChunk.q + 1; q++) {
+          for (let r = playerChunk.r - 1; r <= playerChunk.r + 1; r++) {
+            this.requestChunk(q, r, 100); // Высокий приоритет для аварийной загрузки
+          }
+        }
         this.emergencyAttempts += 1;
       } else if (!this.stopEmergencyLogs) {
-        console.error('[World] Достигнут лимит попыток загрузки чанков, прекращаю аварийные попытки');
+        console.error('[World] Достигнут лимит попыток загрузки чанков');
         this.stopEmergencyLogs = true;
         if (!this.fallbackInjected) {
           this.injectFallbackChunk(playerChunk.q, playerChunk.r);
         }
       }
-      if (this.debugLogsLeft > 0) {
-        console.warn(
-          `[World] chunks.size=0 перед циклом, playerChunk=${playerChunk.q},${playerChunk.r}, attempts=${this.emergencyAttempts}`
-        );
-        this.debugLogsLeft -= 1;
-      }
 
       if (this.emergencyAttempts >= this.maxEmergencyAttempts) {
+        this.updateFogBarrier(playerX, playerZ);
         return;
       }
     } else {
       this.emergencyAttempts = 0;
       this.stopEmergencyLogs = false;
-
-      if (this.debugLogsLeft > 0) {
-        console.info(`[World] update ok chunks=${this.chunks.size} meshes=${this.chunkMeshes.size}`);
-        this.debugLogsLeft -= 1;
-      }
     }
 
-    // Проверяем время выполнения перед генерацией чанков
-    const timeBeforeChunks = performance.now() - frameStartTime;
-    if (timeBeforeChunks > maxFrameTime) {
-      // Пропускаем генерацию чанков если уже потратили слишком много времени
-      this.updateFogBarrier(playerX, playerZ);
-      return;
-    }
-
-    // Генерируем чанки вокруг игрока в фоне
-    // Разбиваем на небольшие порции для предотвращения блокировки UI
-    const chunksToLoad: { q: number; r: number }[] = [];
+    // Запрашиваем чанки вокруг игрока (но не генерируем их здесь)
+    // Генерация происходит в отдельном процессе через очередь
     for (let q = playerChunk.q - this.renderDistance; q <= playerChunk.q + this.renderDistance; q++) {
       for (let r = playerChunk.r - this.renderDistance; r <= playerChunk.r + this.renderDistance; r++) {
-        const key = getChunkKey(q, r);
-        if (!this.chunks.has(key)) {
-          chunksToLoad.push({ q, r });
-        }
-      }
-    }
-    
-    // Загружаем чанки по одному для предотвращения блокировки UI
-    // Ограничиваем количество загружаемых чанков за один вызов update
-    const maxChunksPerUpdate = 1; // Загружаем по одному чанку за раз
-    for (let i = 0; i < Math.min(maxChunksPerUpdate, chunksToLoad.length); i++) {
-      const chunk = chunksToLoad[i];
-      this.loadChunk(chunk.q, chunk.r);
-      
-      // Проверяем время после каждой операции
-      const currentTime = performance.now() - frameStartTime;
-      if (currentTime > maxFrameTime) {
-        // Пропускаем остальные операции если превысили лимит времени
-        break;
+        // Приоритет зависит от расстояния до игрока (ближе = выше приоритет)
+        const distance = Math.max(Math.abs(q - playerChunk.q), Math.abs(r - playerChunk.r));
+        const priority = this.renderDistance - distance;
+        this.requestChunk(q, r, priority);
       }
     }
 
-    // Проверяем время перед выгрузкой чанков
-    const timeBeforeUnload = performance.now() - frameStartTime;
-    if (timeBeforeUnload < maxFrameTime) {
-      this.unloadDistantChunks(playerChunk.q, playerChunk.r);
-    }
-    // Обновление барьера тумана всегда выполняется (легкая операция)
+    this.unloadDistantChunks(playerChunk.q, playerChunk.r);
     this.updateFogBarrier(playerX, playerZ);
 
     // Обновление анимации текстур для режима Modern
@@ -274,46 +246,62 @@ export class World {
     });
   }
 
-  private async loadChunkAsync(chunkQ: number, chunkR: number): Promise<void> {
+  // КРИТИЧНО: update() может только запрашивать чанки, но не генерировать их
+  requestChunk(chunkQ: number, chunkR: number, priority: number = 0): void {
     const key = getChunkKey(chunkQ, chunkR);
     if (this.chunks.has(key)) return;
-
-    if (this.debugLogsLeft > 0) {
-      console.info(`[World] loadChunkAsync start key=${key} beforeSize=${this.chunks.size}`);
-    }
-
-    // Асинхронная генерация чанка с yield к браузеру
-    const chunk = await this.generator.generateChunk(chunkQ, chunkR);
     
-    this.chunks.set(key, chunk);
-    this.loadAttempts += 1;
-
-    this.createChunkMeshes(chunk);
-
-    if (chunk.blocks.length === 0) {
-      console.warn(`[World] Пустой чанк ${key} biome=${chunk.biome}`);
-    } else {
-      console.debug(`[World] Чанк ${key} biome=${chunk.biome} blocks=${chunk.blocks.length}`);
-    }
-
-    if (this.debugLogsLeft > 0) {
-      console.info(`[World] loadChunkAsync done key=${key} afterSize=${this.chunks.size} blocks=${chunk.blocks.length}`);
-      this.debugLogsLeft -= 1;
+    // Проверяем, не запрошен ли уже этот чанк
+    const alreadyQueued = this.chunkGenerationQueue.some(item => item.q === chunkQ && item.r === chunkR);
+    if (alreadyQueued) return;
+    
+    // Добавляем в очередь генерации
+    this.chunkGenerationQueue.push({ q: chunkQ, r: chunkR, priority });
+    this.chunkGenerationQueue.sort((a, b) => b.priority - a.priority); // Сортируем по приоритету
+    
+    // Запускаем процесс генерации если он еще не запущен
+    if (!this.isGenerating) {
+      this.startGenerationLoop();
     }
   }
 
-  private loadChunk(chunkQ: number, chunkR: number): void {
-    // Синхронная версия для обратной совместимости (используется в update)
-    // В фоновой генерации используем асинхронную версию через очередь
-    const key = getChunkKey(chunkQ, chunkR);
-    if (this.chunks.has(key)) return;
+  private startGenerationLoop(): void {
+    if (this.isGenerating) return;
+    this.isGenerating = true;
+    this.processGenerationQueue();
+  }
 
-    // Для фоновой генерации используем асинхронную версию
-    // Но так как это вызывается из update(), который синхронный,
-    // мы запускаем асинхронную загрузку без await
-    this.loadChunkAsync(chunkQ, chunkR).catch(err => {
-      console.error(`[World] Ошибка загрузки чанка ${key}:`, err);
-    });
+  private async processGenerationQueue(): Promise<void> {
+    while (this.chunkGenerationQueue.length > 0) {
+      // Берем чанк с наивысшим приоритетом
+      const request = this.chunkGenerationQueue.shift();
+      if (!request) break;
+      
+      const { q, r } = request;
+      const key = getChunkKey(q, r);
+      
+      // Проверяем, не загружен ли уже чанк
+      if (this.chunks.has(key)) continue;
+      
+      // Yield к браузеру перед генерацией каждого чанка
+      await new Promise<void>(resolve => requestAnimationFrame(() => resolve()));
+      
+      // Генерируем чанк полностью синхронно
+      const chunk = this.generator.generateChunk(q, r);
+      
+      // Добавляем чанк в мир только после полной генерации
+      this.chunks.set(key, chunk);
+      this.loadAttempts += 1;
+      this.createChunkMeshes(chunk);
+      
+      if (chunk.blocks.length === 0) {
+        console.warn(`[World] Пустой чанк ${key} biome=${chunk.biome}`);
+      } else {
+        console.debug(`[World] Чанк ${key} biome=${chunk.biome} blocks=${chunk.blocks.length}`);
+      }
+    }
+    
+    this.isGenerating = false;
   }
 
   private createChunkMeshes(chunk: Chunk): void {
@@ -627,9 +615,10 @@ export class World {
   }
 
   private forceLoadAround(centerQ: number, centerR: number): void {
+    // Запрашиваем чанки вокруг центра с высоким приоритетом
     for (let q = centerQ - 1; q <= centerQ + 1; q++) {
       for (let r = centerR - 1; r <= centerR + 1; r++) {
-        this.loadChunk(q, r);
+        this.requestChunk(q, r, 100); // Высокий приоритет для аварийной загрузки
       }
     }
   }

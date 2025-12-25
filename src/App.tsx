@@ -101,35 +101,33 @@ function App() {
     settingsRef.current = mergedSettings;
     setSettings(mergedSettings);
     
-    // ШАГ 1: Показываем экран загрузки НЕМЕДЛЕННО
+    // КОНТРАКТ СТАРТА (NON-NEGOTIABLE):
+    // 1. Показать экран загрузки
     setCurrentScreen('loading');
     setLoadingProgress(0);
     setLoadingStatus('Инициализация мира...');
 
-    // ШАГ 2: Yield к браузеру чтобы экран загрузки успел отобразиться
+    // 2. await первый кадр анимации
     await new Promise<void>(resolve => requestAnimationFrame(() => resolve()));
 
-    setLoadingProgress(10);
+    setLoadingProgress(20);
     setLoadingStatus('Создание мира...');
 
-    // ШАГ 3: Создаем временную сцену для генерации первого чанка
+    // 3. Создаем временную сцену для генерации первого чанка
     const tempScene = new THREE.Scene();
     const tempWorld = new World(tempScene, mergedSettings);
-    
-    // Инициализируем мир (без генерации чанков)
     tempWorld.initialize();
     
-    setLoadingProgress(20);
-    setLoadingStatus('Генерация первого биома...');
+    setLoadingProgress(40);
+    setLoadingStatus('Генерация первого чанка...');
 
-    // ШАГ 4: Асинхронно генерируем ТОЛЬКО первый чанк (0, 0)
-    // Это будет использовать requestAnimationFrame для yield к браузеру
+    // 4. Генерируем чанк (0,0) полностью
     await tempWorld.initializeAsync();
     
     setLoadingProgress(70);
     setLoadingStatus('Поиск точки спавна...');
 
-    // ШАГ 5: Находим высоту спавна
+    // 5. Находим высоту спавна
     let spawnHeight: number | null = tempWorld.getHighestBlockAt(0, 0);
     
     if (spawnHeight === null) {
@@ -140,26 +138,24 @@ function App() {
     setLoadingProgress(85);
     setLoadingStatus('Размещение игрока...');
 
-    // ШАГ 6: Вычисляем позицию спавна игрока
+    // 6. Вычисляем позицию спавна игрока
     const spawnPos = hexToWorld(0, 0, 0);
     const finalY = spawnHeight + 1.7; // Добавляем высоту игрока
 
-    // ШАГ 7: Очищаем временную сцену
+    // 7. Очищаем временную сцену
     tempScene.clear();
 
-    // ШАГ 8: Yield к браузеру перед переключением экрана
+    // 8. Yield к браузеру перед переключением экрана
     await new Promise<void>(resolve => requestAnimationFrame(() => resolve()));
 
     setLoadingProgress(100);
     setLoadingStatus('Запуск игры...');
 
-    // ШАГ 9: Переключаемся на игровой экран
-    // Игрок будет размещен в useEffect после создания Game
+    // 9. Переключаемся на игровой экран
     setShowHelpHint(true);
     setCurrentScreen('game');
     
     // Сохраняем позицию спавна для использования в useEffect
-    // Используем ref для передачи данных между функциями
     (window as any).__spawnPosition = { x: spawnPos.x, y: finalY, z: spawnPos.z };
   };
 
