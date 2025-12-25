@@ -79,6 +79,15 @@ export class Game {
     this.animate(0);
   }
 
+  setPlayerPosition(x: number, y: number, z: number): void {
+    this.player.position.set(x, y, z);
+    this.camera.position.copy(this.player.position);
+  }
+
+  getSpawnHeight(q: number, r: number): number | null {
+    return this.world.getHighestBlockAt(q, r);
+  }
+
   private setupEventListeners(): void {
     window.addEventListener('resize', () => {
       this.camera.aspect = window.innerWidth / window.innerHeight;

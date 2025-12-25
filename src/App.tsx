@@ -5,11 +5,15 @@ import { MainMenu } from './components/MainMenu';
 import { AboutPage } from './components/AboutPage';
 import { OptionsPage } from './components/OptionsPage';
 import { WorldSetupMenu } from './components/WorldSetupMenu';
+import { LoadingScreen } from './components/LoadingScreen';
 import { GameSettings, DEFAULT_SETTINGS, WorldSetup } from './types/settings';
 import { LanguageProvider } from './contexts/LanguageContext';
 import { Language } from './utils/i18n';
+import { World } from './game/World';
+import * as THREE from 'three';
+import { hexToWorld } from './utils/hexUtils';
 
-type Screen = 'menu' | 'worldSetup' | 'game' | 'about' | 'options';
+type Screen = 'menu' | 'worldSetup' | 'loading' | 'game' | 'about' | 'options';
 
 function App() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -20,6 +24,8 @@ function App() {
   const [showHelpHint, setShowHelpHint] = useState(false);
   const [settings, setSettings] = useState<GameSettings>(DEFAULT_SETTINGS);
   const [language, setLanguage] = useState<Language>(DEFAULT_SETTINGS.language);
+  const [loadingProgress, setLoadingProgress] = useState(0);
+  const [loadingStatus, setLoadingStatus] = useState('');
   const [gameState, setGameState] = useState<GameState>({
     playerPosition: { x: 0, y: 0, z: 0 },
     isFlying: true,
@@ -44,6 +50,18 @@ function App() {
         setGameState(state);
       }, settingsRef.current);
 
+      // Размещаем игрока на правильной высоте после создания игры
+      // Используем setTimeout, чтобы дать миру время инициализироваться
+      setTimeout(() => {
+        if (gameRef.current) {
+          const spawnHeight = gameRef.current.getSpawnHeight(0, 0);
+          const spawnPos = hexToWorld(0, 0, 0);
+          const finalY = spawnHeight !== null ? spawnHeight + 1.7 : 10;
+          
+          gameRef.current.setPlayerPosition(spawnPos.x, finalY, spawnPos.z);
+        }
+      }, 200);
+
       const handleKeyDown = (e: KeyboardEvent) => {
         if (e.code === 'Backquote') {
           e.preventDefault();
@@ -67,7 +85,7 @@ function App() {
     setCurrentScreen('worldSetup');
   };
 
-  const handleWorldSetupStart = (worldSetup: WorldSetup) => {
+  const handleWorldSetupStart = async (worldSetup: WorldSetup) => {
     // Объединяем настройки мира с текущими настройками игры
     const mergedSettings: GameSettings = {
       ...settingsRef.current,
@@ -76,6 +94,50 @@ function App() {
     };
     settingsRef.current = mergedSettings;
     setSettings(mergedSettings);
+    
+    // Переключаемся на экран загрузки
+    setCurrentScreen('loading');
+    setLoadingProgress(0);
+    setLoadingStatus('Инициализация мира...');
+
+    // Создаем временную сцену для генерации первого чанка
+    const tempScene = new THREE.Scene();
+    const tempWorld = new World(tempScene, mergedSettings);
+    
+    setLoadingProgress(20);
+    setLoadingStatus('Генерация первого биома...');
+
+    // Генерируем первый чанк (0, 0)
+    tempWorld.initialize();
+    
+    // Ждем немного, чтобы чанк успел загрузиться
+    await new Promise(resolve => setTimeout(resolve, 100));
+    
+    setLoadingProgress(60);
+    setLoadingStatus('Поиск точки спавна...');
+
+    // Находим самую высокую точку в координатах q:0, r:0
+    const spawnHeight = tempWorld.getHighestBlockAt(0, 0);
+    
+    if (spawnHeight === null) {
+      // Если не нашли блок, используем высоту по умолчанию
+      setLoadingProgress(80);
+      setLoadingStatus('Использование точки спавна по умолчанию...');
+    } else {
+      setLoadingProgress(80);
+      setLoadingStatus('Размещение игрока...');
+    }
+
+    setLoadingProgress(90);
+    setLoadingStatus('Запуск игры...');
+
+    // Очищаем временную сцену
+    tempScene.clear();
+
+    // Небольшая задержка для плавности
+    await new Promise(resolve => setTimeout(resolve, 200));
+
+    setLoadingProgress(100);
     setShowHelpHint(true);
     setCurrentScreen('game');
   };
@@ -133,6 +195,10 @@ function App() {
           onBack={handleWorldSetupBack}
           defaultRenderingMode={settings.renderingMode}
         />
+      )}
+
+      {currentScreen === 'loading' && (
+        <LoadingScreen progress={loadingProgress} status={loadingStatus} />
       )}
 
       {currentScreen === 'about' && (

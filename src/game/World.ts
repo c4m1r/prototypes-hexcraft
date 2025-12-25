@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { Chunk, Block, BLOCK_TYPES } from '../types/game';
 import { ChunkGenerator } from './ChunkGenerator';
-import { hexToWorld, getChunkKey, worldToChunk, createHexGeometry, createHexGeometryWithUV, worldToHex } from '../utils/hexUtils';
+import { hexToWorld, getChunkKey, worldToChunk, createHexGeometry, createHexGeometryWithUV, worldToHex, HEX_HEIGHT } from '../utils/hexUtils';
 import { GameSettings, DEFAULT_SETTINGS, RenderingMode } from '../types/settings';
 import { TextureManager } from './TextureManager';
 
@@ -599,6 +599,38 @@ export class World {
     const baseNear = 50 / this.fogDensity;
     const baseFar = 150 / this.fogDensity;
     this.scene.fog = new THREE.Fog(0x87ceeb, baseNear, baseFar);
+  }
+
+  getHighestBlockAt(q: number, r: number): number | null {
+    // Находим чанк, в котором находится эта позиция
+    const worldPos = hexToWorld(q, r, 0);
+    const chunkPos = worldToChunk(worldPos.x, worldPos.z, this.chunkSize);
+    const key = getChunkKey(chunkPos.q, chunkPos.r);
+    const chunk = this.chunks.get(key);
+
+    if (!chunk) {
+      return null;
+    }
+
+    // Ищем самый высокий блок в этой позиции (не считая проходимые блоки)
+    let highestY = -1;
+    for (let y = 32; y >= 0; y--) {
+      const blockKey = `${q},${r},${y}`;
+      const block = chunk.blockMap.get(blockKey);
+      
+      if (block && !this.isPassable(block.type)) {
+        highestY = y;
+        break;
+      }
+    }
+
+    if (highestY === -1) {
+      return null;
+    }
+
+    // Конвертируем в мировые координаты
+    const worldPosWithHeight = hexToWorld(q, r, highestY);
+    return worldPosWithHeight.y + HEX_HEIGHT / 2; // Возвращаем верхнюю точку блока
   }
 
   getDebugInfo(): {
