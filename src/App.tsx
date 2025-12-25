@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Game, GameState } from './game/Game';
+import { InventorySlot } from './types/game';
 import { GameUI } from './components/GameUI';
 import { MainMenu } from './components/MainMenu';
 import { AboutPage } from './components/AboutPage';
@@ -36,8 +37,36 @@ function App() {
     stamina: 100,
     hunger: 100,
     generationCode: 'seed-0',
-    generationStatus: 'chunks:0 meshes:0 rd:0 cs:0/0'
+    generationStatus: 'chunks:0 meshes:0 rd:0 cs:0/0',
+    playerState: {
+      name: 'Player',
+      inventory: [],
+      hotbar: []
+    }
   });
+
+  // Обработчики инвентаря
+  const handleInventoryChange = (inventory: InventorySlot[]) => {
+    setGameState(prev => ({
+      ...prev,
+      playerState: {
+        ...prev.playerState,
+        inventory
+      }
+    }));
+    gameRef.current?.updateInventory(inventory);
+  };
+
+  const handleHotbarChange = (hotbar: InventorySlot[]) => {
+    setGameState(prev => ({
+      ...prev,
+      playerState: {
+        ...prev.playerState,
+        hotbar
+      }
+    }));
+    gameRef.current?.updateHotbar(hotbar);
+  };
 
   useEffect(() => {
     settingsRef.current = settings;
@@ -246,6 +275,9 @@ function App() {
             hunger={gameState.hunger}
             generationCode={gameState.generationCode}
             generationStatus={gameState.generationStatus}
+            playerState={gameState.playerState}
+            onInventoryChange={handleInventoryChange}
+            onHotbarChange={handleHotbarChange}
           />
         </>
       )}

@@ -27,7 +27,57 @@ export interface PlayerState {
   velocity: { x: number; y: number; z: number };
   isFlying: boolean;
   selectedSlot: number;
+  inventory: InventorySlot[];
+  hotbar: InventorySlot[];
+  name: string;
 }
+
+export interface Item {
+  id: string;
+  name: string;
+  type: 'block' | 'tool' | 'material';
+  stackSize: number;
+  maxStackSize: number;
+  rarity: 'common' | 'uncommon' | 'rare' | 'epic' | 'legendary';
+  icon?: string;
+  color?: string;
+  infinite?: boolean; // для хоткеев
+}
+
+export interface InventorySlot {
+  item: Item | null;
+  count: number;
+}
+
+export interface Player {
+  id: string;
+  name: string;
+  position: { x: number; y: number; z: number };
+  isOnline: boolean;
+}
+
+export const ITEMS: Item[] = [
+  // Блоки
+  { id: 'grass', name: 'Grass Block', type: 'block', stackSize: 64, maxStackSize: 64, rarity: 'common', color: '#4a7c3a' },
+  { id: 'dirt', name: 'Dirt Block', type: 'block', stackSize: 64, maxStackSize: 64, rarity: 'common', color: '#8b5a3c' },
+  { id: 'stone', name: 'Stone Block', type: 'block', stackSize: 64, maxStackSize: 64, rarity: 'common', color: '#7a7a7a' },
+  { id: 'sand', name: 'Sand Block', type: 'block', stackSize: 64, maxStackSize: 64, rarity: 'common', color: '#ddc689' },
+  { id: 'wood', name: 'Wood Block', type: 'block', stackSize: 64, maxStackSize: 64, rarity: 'common', color: '#6b4423' },
+  { id: 'leaves', name: 'Leaves Block', type: 'block', stackSize: 64, maxStackSize: 64, rarity: 'common', color: '#2d5016' },
+  { id: 'snow', name: 'Snow Block', type: 'block', stackSize: 64, maxStackSize: 64, rarity: 'common', color: '#e8f2f7' },
+  { id: 'ice', name: 'Ice Block', type: 'block', stackSize: 64, maxStackSize: 64, rarity: 'common', color: '#b8d8e8' },
+  { id: 'lava', name: 'Lava Block', type: 'block', stackSize: 64, maxStackSize: 64, rarity: 'common', color: '#ff4500' },
+
+  // Руда
+  { id: 'bronze', name: 'Bronze Ore', type: 'material', stackSize: 64, maxStackSize: 64, rarity: 'uncommon', color: '#cd7f32' },
+  { id: 'silver', name: 'Silver Ore', type: 'material', stackSize: 64, maxStackSize: 64, rarity: 'rare', color: '#c0c0c0' },
+  { id: 'gold', name: 'Gold Ore', type: 'material', stackSize: 64, maxStackSize: 64, rarity: 'epic', color: '#ffd700' },
+
+  // Инструменты
+  { id: 'pickaxe', name: 'Pickaxe', type: 'tool', stackSize: 1, maxStackSize: 1, rarity: 'common' },
+  { id: 'axe', name: 'Axe', type: 'tool', stackSize: 1, maxStackSize: 1, rarity: 'common' },
+  { id: 'shovel', name: 'Shovel', type: 'tool', stackSize: 1, maxStackSize: 1, rarity: 'common' },
+];
 
 export const BLOCK_TYPES: BlockType[] = [
   { id: 'grass', name: 'Grass', color: '#4a7c3a' },

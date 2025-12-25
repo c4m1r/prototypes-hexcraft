@@ -1,4 +1,7 @@
 import { useState, useEffect } from 'react';
+import Inventory from './Inventory';
+import { InventorySlot } from '../types/game';
+import './Inventory.css';
 
 interface GameUIProps {
   showDebug: boolean;
@@ -13,6 +16,9 @@ interface GameUIProps {
   hunger: number;
   generationCode: string;
   generationStatus: string;
+  playerState: any; // TODO: типизировать
+  onInventoryChange: (inventory: InventorySlot[]) => void;
+  onHotbarChange: (hotbar: InventorySlot[]) => void;
 }
 
 export function GameUI({
@@ -27,9 +33,13 @@ export function GameUI({
   stamina,
   hunger,
   generationCode,
-  generationStatus
+  generationStatus,
+  playerState,
+  onInventoryChange,
+  onHotbarChange
 }: GameUIProps) {
   const [helpVisible, setHelpVisible] = useState(showHelpHint);
+  const [inventoryOpen, setInventoryOpen] = useState(false);
 
   useEffect(() => {
     if (showHelpHint) {
@@ -38,6 +48,19 @@ export function GameUI({
       return () => clearTimeout(timer);
     }
   }, [showHelpHint]);
+
+  // Обработчик клавиши TAB для открытия инвентаря
+  useEffect(() => {
+    const handleKeyPress = (event: KeyboardEvent) => {
+      if (event.key === 'Tab') {
+        event.preventDefault();
+        setInventoryOpen(prev => !prev);
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyPress);
+    return () => document.removeEventListener('keydown', handleKeyPress);
+  }, []);
 
   return (
     <>
@@ -96,6 +119,15 @@ export function GameUI({
       </div>
 
       <div id="hotbar" className="fixed bottom-8 left-1/2 -translate-x-1/2 pointer-events-none"></div>
+
+      {/* Инвентарь */}
+      <Inventory
+        isOpen={inventoryOpen}
+        onClose={() => setInventoryOpen(false)}
+        playerState={playerState}
+        onInventoryChange={onInventoryChange}
+        onHotbarChange={onHotbarChange}
+      />
 
       {showDebug ? (
         <div className="fixed left-8 top-8 bg-black/70 text-white px-4 py-3 rounded-lg text-xs space-y-2 pointer-events-none border border-white/30 font-mono">
