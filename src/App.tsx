@@ -51,25 +51,22 @@ function App() {
       }, settingsRef.current);
 
       // Размещаем игрока на правильной высоте после создания игры
-      // Используем setTimeout с несколькими попытками, чтобы дать миру время инициализироваться
-      let placementAttempts = 0;
-      const tryPlacePlayer = () => {
-        if (gameRef.current && placementAttempts < 20) {
-          const spawnHeight = gameRef.current.getSpawnHeight(0, 0);
-          
-          if (spawnHeight !== null || placementAttempts >= 19) {
-            const spawnPos = hexToWorld(0, 0, 0);
-            const finalY = spawnHeight !== null ? spawnHeight + 1.7 : 10;
-            
-            gameRef.current.setPlayerPosition(spawnPos.x, finalY, spawnPos.z);
-          } else {
-            placementAttempts++;
-            setTimeout(tryPlacePlayer, 100);
+      // Используем сохраненную позицию спавна из handleWorldSetupStart
+      const spawnPos = (window as any).__spawnPosition;
+      if (spawnPos) {
+        // Yield к браузеру перед размещением игрока
+        requestAnimationFrame(() => {
+          if (gameRef.current) {
+            gameRef.current.setPlayerPosition(spawnPos.x, spawnPos.y, spawnPos.z);
           }
-        }
-      };
-      
-      setTimeout(tryPlacePlayer, 300);
+          // Очищаем временную переменную
+          delete (window as any).__spawnPosition;
+        });
+      } else {
+        // Fallback: используем старый метод если позиция не была сохранена
+        const spawnPos = hexToWorld(0, 0, 0);
+        gameRef.current.setPlayerPosition(spawnPos.x, 10, spawnPos.z);
+      }
 
       const handleKeyDown = (e: KeyboardEvent) => {
         if (e.code === 'Backquote') {
@@ -104,65 +101,66 @@ function App() {
     settingsRef.current = mergedSettings;
     setSettings(mergedSettings);
     
-    // Переключаемся на экран загрузки
+    // ШАГ 1: Показываем экран загрузки НЕМЕДЛЕННО
     setCurrentScreen('loading');
     setLoadingProgress(0);
     setLoadingStatus('Инициализация мира...');
 
-    // Создаем временную сцену для генерации первого чанка
+    // ШАГ 2: Yield к браузеру чтобы экран загрузки успел отобразиться
+    await new Promise<void>(resolve => requestAnimationFrame(() => resolve()));
+
+    setLoadingProgress(10);
+    setLoadingStatus('Создание мира...');
+
+    // ШАГ 3: Создаем временную сцену для генерации первого чанка
     const tempScene = new THREE.Scene();
     const tempWorld = new World(tempScene, mergedSettings);
+    
+    // Инициализируем мир (без генерации чанков)
+    tempWorld.initialize();
     
     setLoadingProgress(20);
     setLoadingStatus('Генерация первого биома...');
 
-    // Генерируем ТОЛЬКО первый чанк (0, 0)
-    tempWorld.initialize();
+    // ШАГ 4: Асинхронно генерируем ТОЛЬКО первый чанк (0, 0)
+    // Это будет использовать requestAnimationFrame для yield к браузеру
+    await tempWorld.initializeAsync();
     
-    // Ждем, чтобы чанк успел полностью загрузиться и сгенерироваться
-    // КРИТИЧНО: Ждем завершения генерации перед размещением игрока
-    let attempts = 0;
-    let spawnHeight: number | null = null;
-    const maxAttempts = 100; // Увеличиваем лимит для надежности
-    while (attempts < maxAttempts && spawnHeight === null) {
-      await new Promise(resolve => setTimeout(resolve, 50)); // Yield к браузеру каждые 50ms
-      spawnHeight = tempWorld.getHighestBlockAt(0, 0);
-      attempts++;
-      
-      setLoadingProgress(20 + Math.min(40, Math.floor(attempts * 40 / maxAttempts)));
-      setLoadingStatus(`Генерация первого биома... (${attempts}/${maxAttempts})`);
-    }
-    
-    // Если чанк не загрузился, используем высоту по умолчанию
-    if (spawnHeight === null && attempts >= maxAttempts) {
-      console.warn('[App] Чанк (0,0) не загрузился за отведенное время, используем высоту по умолчанию');
-    }
-    
-    setLoadingProgress(60);
+    setLoadingProgress(70);
     setLoadingStatus('Поиск точки спавна...');
 
-    // Находим самую высокую точку в координатах q:0, r:0
+    // ШАГ 5: Находим высоту спавна
+    let spawnHeight: number | null = tempWorld.getHighestBlockAt(0, 0);
+    
     if (spawnHeight === null) {
-      // Если не нашли блок, используем высоту по умолчанию
-      setLoadingProgress(80);
-      setLoadingStatus('Использование точки спавна по умолчанию...');
-    } else {
-      setLoadingProgress(80);
-      setLoadingStatus('Размещение игрока...');
+      console.warn('[App] Чанк (0,0) не содержит блоков, используем высоту по умолчанию');
+      spawnHeight = 10; // Высота по умолчанию
     }
 
-    setLoadingProgress(90);
-    setLoadingStatus('Запуск игры...');
+    setLoadingProgress(85);
+    setLoadingStatus('Размещение игрока...');
 
-    // Очищаем временную сцену
+    // ШАГ 6: Вычисляем позицию спавна игрока
+    const spawnPos = hexToWorld(0, 0, 0);
+    const finalY = spawnHeight + 1.7; // Добавляем высоту игрока
+
+    // ШАГ 7: Очищаем временную сцену
     tempScene.clear();
 
-    // Небольшая задержка для плавности
-    await new Promise(resolve => setTimeout(resolve, 300));
+    // ШАГ 8: Yield к браузеру перед переключением экрана
+    await new Promise<void>(resolve => requestAnimationFrame(() => resolve()));
 
     setLoadingProgress(100);
+    setLoadingStatus('Запуск игры...');
+
+    // ШАГ 9: Переключаемся на игровой экран
+    // Игрок будет размещен в useEffect после создания Game
     setShowHelpHint(true);
     setCurrentScreen('game');
+    
+    // Сохраняем позицию спавна для использования в useEffect
+    // Используем ref для передачи данных между функциями
+    (window as any).__spawnPosition = { x: spawnPos.x, y: finalY, z: spawnPos.z };
   };
 
   const handleWorldSetupBack = () => {

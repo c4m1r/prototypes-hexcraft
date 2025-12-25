@@ -66,6 +66,7 @@ export class Game {
     this.dayNightCycle = new DayNightCycle(this.scene, this.directionalLight, this.ambientLight);
 
     this.world = new World(this.scene, settings);
+    // Инициализируем мир (без генерации чанков - они будут генерироваться асинхронно в update())
     this.world.initialize();
 
     this.player = new PlayerController(this.camera);

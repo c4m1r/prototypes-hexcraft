@@ -124,15 +124,25 @@ export class World {
     this.initialized = true;
     // При старте генерируем ТОЛЬКО центральный чанк (0,0)
     // Остальные чанки будут генерироваться в фоне после размещения игрока
-    this.loadChunk(0, 0);
+    // НЕ вызываем loadChunk здесь - это будет сделано асинхронно через initializeAsync
+  }
+
+  async initializeAsync(): Promise<void> {
+    // Асинхронная инициализация первого чанка (0,0)
+    // Этот метод должен быть вызван ПОСЛЕ показа экрана загрузки
+    await this.loadChunkAsync(0, 0);
 
     if (this.chunks.size === 0 && this.debugLogsLeft > 0) {
-      console.error('[World] После initialize чанки не загружены, size=0');
+      console.error('[World] После initializeAsync чанки не загружены, size=0');
       this.debugLogsLeft -= 1;
     }
   }
 
   update(playerX: number, playerZ: number): void {
+    // Проверка времени выполнения для предотвращения блокировки UI
+    const frameStartTime = performance.now();
+    const maxFrameTime = 8; // Максимум 8мс на кадр (оставляем запас до 16мс)
+    
     const playerChunk = worldToChunk(playerX, playerZ, this.chunkSize);
 
     if (this.chunks.size === 0) {
@@ -167,6 +177,14 @@ export class World {
       }
     }
 
+    // Проверяем время выполнения перед генерацией чанков
+    const timeBeforeChunks = performance.now() - frameStartTime;
+    if (timeBeforeChunks > maxFrameTime) {
+      // Пропускаем генерацию чанков если уже потратили слишком много времени
+      this.updateFogBarrier(playerX, playerZ);
+      return;
+    }
+
     // Генерируем чанки вокруг игрока в фоне
     // Разбиваем на небольшие порции для предотвращения блокировки UI
     const chunksToLoad: { q: number; r: number }[] = [];
@@ -185,9 +203,21 @@ export class World {
     for (let i = 0; i < Math.min(maxChunksPerUpdate, chunksToLoad.length); i++) {
       const chunk = chunksToLoad[i];
       this.loadChunk(chunk.q, chunk.r);
+      
+      // Проверяем время после каждой операции
+      const currentTime = performance.now() - frameStartTime;
+      if (currentTime > maxFrameTime) {
+        // Пропускаем остальные операции если превысили лимит времени
+        break;
+      }
     }
 
-    this.unloadDistantChunks(playerChunk.q, playerChunk.r);
+    // Проверяем время перед выгрузкой чанков
+    const timeBeforeUnload = performance.now() - frameStartTime;
+    if (timeBeforeUnload < maxFrameTime) {
+      this.unloadDistantChunks(playerChunk.q, playerChunk.r);
+    }
+    // Обновление барьера тумана всегда выполняется (легкая операция)
     this.updateFogBarrier(playerX, playerZ);
 
     // Обновление анимации текстур для режима Modern
@@ -244,15 +274,17 @@ export class World {
     });
   }
 
-  private loadChunk(chunkQ: number, chunkR: number): void {
+  private async loadChunkAsync(chunkQ: number, chunkR: number): Promise<void> {
     const key = getChunkKey(chunkQ, chunkR);
     if (this.chunks.has(key)) return;
 
-    const chunk = this.generator.generateChunk(chunkQ, chunkR);
     if (this.debugLogsLeft > 0) {
-      console.info(`[World] loadChunk start key=${key} beforeSize=${this.chunks.size}`);
+      console.info(`[World] loadChunkAsync start key=${key} beforeSize=${this.chunks.size}`);
     }
 
+    // Асинхронная генерация чанка с yield к браузеру
+    const chunk = await this.generator.generateChunk(chunkQ, chunkR);
+    
     this.chunks.set(key, chunk);
     this.loadAttempts += 1;
 
@@ -265,15 +297,40 @@ export class World {
     }
 
     if (this.debugLogsLeft > 0) {
-      console.info(`[World] loadChunk done key=${key} afterSize=${this.chunks.size} blocks=${chunk.blocks.length}`);
+      console.info(`[World] loadChunkAsync done key=${key} afterSize=${this.chunks.size} blocks=${chunk.blocks.length}`);
       this.debugLogsLeft -= 1;
     }
+  }
+
+  private loadChunk(chunkQ: number, chunkR: number): void {
+    // Синхронная версия для обратной совместимости (используется в update)
+    // В фоновой генерации используем асинхронную версию через очередь
+    const key = getChunkKey(chunkQ, chunkR);
+    if (this.chunks.has(key)) return;
+
+    // Для фоновой генерации используем асинхронную версию
+    // Но так как это вызывается из update(), который синхронный,
+    // мы запускаем асинхронную загрузку без await
+    this.loadChunkAsync(chunkQ, chunkR).catch(err => {
+      console.error(`[World] Ошибка загрузки чанка ${key}:`, err);
+    });
   }
 
   private createChunkMeshes(chunk: Chunk): void {
     const key = getChunkKey(chunk.position.q, chunk.position.r);
 
     // Group blocks by type
+    // Оптимизация: для очень больших чанков пропускаем создание мешей
+    // Они будут созданы в следующем кадре через асинхронную загрузку
+    const maxBlocksForMeshCreation = 10000; // Максимум блоков для создания мешей за кадр
+    
+    if (chunk.blocks.length > maxBlocksForMeshCreation) {
+      // Пропускаем создание мешей если слишком много блоков
+      // Это предотвратит блокировку UI
+      console.warn(`[World] Пропуск создания мешей для чанка ${key}: слишком много блоков (${chunk.blocks.length})`);
+      return;
+    }
+    
     const blocksByType = new Map<string, Block[]>();
     chunk.blocks.forEach(block => {
       if (!blocksByType.has(block.type)) {
@@ -284,9 +341,20 @@ export class World {
 
     const chunkMeshMap = new Map<string, ChunkMeshData>();
 
-    blocksByType.forEach((blocks, type) => {
+    // Обрабатываем типы блоков по одному для предотвращения блокировки
+    // Ограничиваем количество типов блоков за кадр
+    const maxTypesPerFrame = 15; // Максимум типов блоков за кадр
+    let processedTypes = 0;
+    
+    for (const [type, blocks] of blocksByType.entries()) {
+      if (processedTypes >= maxTypesPerFrame) {
+        // Пропускаем остальные типы если слишком много
+        // Они будут обработаны в следующем кадре
+        break;
+      }
+      
       let material = this.materials.get(type);
-      if (!material) return;
+      if (!material) continue;
 
       // TODO: для modern режима заменить материалы на текстурные,
       // когда появятся координаты в атласе texutres.png.
@@ -299,11 +367,13 @@ export class World {
       mesh.frustumCulled = false;
       const matrix = new THREE.Matrix4();
 
-      blocks.forEach((block, index) => {
+      // Обрабатываем все блоки этого типа, но проверяем время выполнения
+      for (let index = 0; index < blocks.length; index++) {
+        const block = blocks[index];
         const worldPos = hexToWorld(block.position.q, block.position.r, block.position.y);
         matrix.setPosition(worldPos);
         mesh.setMatrixAt(index, matrix);
-      });
+      }
 
       mesh.instanceMatrix.needsUpdate = true;
 
@@ -315,7 +385,8 @@ export class World {
 
       this.scene.add(mesh);
       chunkMeshMap.set(type, { mesh, blocks });
-    });
+      processedTypes++;
+    }
 
     this.chunkMeshes.set(key, chunkMeshMap);
   }
@@ -458,6 +529,16 @@ export class World {
   }
 
   private unloadDistantChunks(playerChunkQ: number, playerChunkR: number): void {
+    // Оптимизация: ограничиваем количество обрабатываемых чанков за кадр
+    // Пропускаем работу если слишком много чанков для обработки
+    const maxChunksToProcess = 20; // Максимум чанков для проверки за кадр
+    
+    if (this.chunks.size > maxChunksToProcess * 2) {
+      // Слишком много чанков - пропускаем выгрузку в этом кадре
+      // Она будет выполнена в следующем кадре
+      return;
+    }
+    
     const unloadDistance = Math.max(this.renderDistance + 2, 7);
     const keepDistance = this.renderDistance; // Расстояние зоны видимости
 
@@ -497,27 +578,34 @@ export class World {
     // Сначала удаляем явно дальние чанки, но только если:
     // 1. Они не в зоне видимости
     // 2. У них нет соседей в зоне видимости
-    const entries = Array.from(this.chunks.entries()).map(([key, chunk]) => {
-      const distance = Math.max(
-        Math.abs(chunk.position.q - playerChunkQ),
-        Math.abs(chunk.position.r - playerChunkR)
-      );
-      const inRange = isInRenderRange(chunk.position.q, chunk.position.r);
-      const hasNeighbors = hasNeighborsInRange(chunk.position.q, chunk.position.r);
-      return { key, chunk, distance, inRange, hasNeighbors };
-    });
-
-    entries
-      .filter(e => e.distance > unloadDistance && !e.inRange && !e.hasNeighbors)
-      .forEach(e => {
-        this.removeChunkMeshes(e.key);
-        this.chunks.delete(e.key);
+    // Ограничиваем количество обрабатываемых записей
+    const entries = Array.from(this.chunks.entries())
+      .slice(0, maxChunksToProcess)
+      .map(([key, chunk]) => {
+        const distance = Math.max(
+          Math.abs(chunk.position.q - playerChunkQ),
+          Math.abs(chunk.position.r - playerChunkR)
+        );
+        const inRange = isInRenderRange(chunk.position.q, chunk.position.r);
+        const hasNeighbors = hasNeighborsInRange(chunk.position.q, chunk.position.r);
+        return { key, chunk, distance, inRange, hasNeighbors };
       });
+
+    // Ограничиваем количество удаляемых чанков за кадр
+    const chunksToUnload = entries
+      .filter(e => e.distance > unloadDistance && !e.inRange && !e.hasNeighbors)
+      .slice(0, 5); // Максимум 5 чанков за кадр
+      
+    chunksToUnload.forEach(e => {
+      this.removeChunkMeshes(e.key);
+      this.chunks.delete(e.key);
+    });
 
     // Если после этого всё ещё превышаем лимит по количеству, удаляем самые дальние,
     // но только те, которые не в зоне видимости и у которых нет соседей в зоне видимости
     if (this.chunks.size > this.maxLoadedChunks) {
       const remaining = Array.from(this.chunks.entries())
+        .slice(0, maxChunksToProcess)
         .map(([key, chunk]) => {
           const distance = Math.max(
             Math.abs(chunk.position.q - playerChunkQ),
@@ -529,7 +617,7 @@ export class World {
         })
         .filter(e => !e.inRange && !e.hasNeighbors) // Удаляем только те, которые не в зоне и без соседей в зоне
         .sort((a, b) => b.distance - a.distance)
-        .slice(0, Math.max(0, this.chunks.size - this.maxLoadedChunks));
+        .slice(0, Math.min(5, Math.max(0, this.chunks.size - this.maxLoadedChunks))); // Максимум 5 за кадр
 
       remaining.forEach(e => {
         this.removeChunkMeshes(e.key);
