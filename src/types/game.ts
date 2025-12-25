@@ -29,6 +29,7 @@ export interface PlayerState {
   selectedSlot: number;
   inventory: InventorySlot[];
   hotbar: InventorySlot[];
+  equipment: EquipmentSlot[];
   name: string;
 }
 
@@ -56,6 +57,12 @@ export interface DroppedItem {
 export interface InventorySlot {
   item: Item | null;
   count: number;
+}
+
+export interface EquipmentSlot {
+  type: 'helmet' | 'chestplate' | 'leggings' | 'boots' | 'cape' | 'artifact1' | 'artifact2' | 'artifact3';
+  item: Item | null;
+  name: string;
 }
 
 export interface Player {

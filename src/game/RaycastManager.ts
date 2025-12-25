@@ -116,13 +116,20 @@ export class RaycastManager {
 
   removeBlock(camera: THREE.Camera): Block | null {
     const result = this.raycast(camera);
-    if (!result) return null;
+    if (!result) {
+      console.log('Raycast failed - no block hit');
+      return null;
+    }
 
-    return this.world.removeBlock(
+    console.log('Raycast hit block at:', result.block.position);
+    const removedBlock = this.world.removeBlock(
       result.block.position.q,
       result.block.position.r,
       result.block.position.y
     );
+
+    console.log('Removed block:', removedBlock);
+    return removedBlock;
   }
 
   getTargetedBlock(camera: THREE.Camera): { block: Block; name: string } | null {

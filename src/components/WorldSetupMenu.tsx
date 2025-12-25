@@ -12,7 +12,6 @@ export function WorldSetupMenu({ onStart, onBack, defaultRenderingMode }: WorldS
   const { t } = useLanguage();
   const [playerName, setPlayerName] = useState<string>('');
   const [gameMode, setGameMode] = useState<GameMode>('Solo');
-  const [renderingMode, setRenderingMode] = useState<RenderingMode>(defaultRenderingMode);
   const [seed, setSeed] = useState<string>('');
 
   // Генерируем случайный seed при первом рендере
@@ -54,7 +53,6 @@ export function WorldSetupMenu({ onStart, onBack, defaultRenderingMode }: WorldS
     onStart({
       playerName: playerName.trim() || t.worldSetup.playerNamePlaceholder,
       gameMode,
-      renderingMode,
       seed: finalSeed
     });
   };
@@ -101,23 +99,6 @@ export function WorldSetupMenu({ onStart, onBack, defaultRenderingMode }: WorldS
             </label>
           </div>
 
-          {/* Rendering Mode */}
-          <div className="bg-gray-900 p-6 rounded-lg border border-white/20">
-            <label className="block mb-2">
-              <div className="text-lg font-semibold mb-2 text-white">{t.worldSetup.blockRenderMode}</div>
-              <select
-                value={renderingMode}
-                onChange={(e) => setRenderingMode(e.target.value as RenderingMode)}
-                className="w-full bg-gray-800 border border-white/20 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-white/40"
-              >
-                <option value="prototype">{t.worldSetup.renderingModePrototype}</option>
-                <option value="modern">{t.worldSetup.renderingModeModern}</option>
-              </select>
-              <div className="text-sm text-gray-400 mt-2">
-                {t.worldSetup.renderingModeDesc}
-              </div>
-            </label>
-          </div>
 
           {/* World Seed */}
           <div className="bg-gray-900 p-6 rounded-lg border border-white/20">

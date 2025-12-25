@@ -154,21 +154,6 @@ export function OptionsPage({ onBack, onSave, currentSettings }: OptionsPageProp
             </label>
           </div>
 
-          {/* Rendering Mode */}
-          <div className="bg-gray-900 p-3 rounded-lg border border-white/20">
-            <label className="block">
-              <div className="text-sm font-semibold mb-1">{t.options.renderingMode}</div>
-              <div className="text-xs text-gray-400 mb-2">{t.options.renderingModeDesc}</div>
-              <select
-                value={settings.renderingMode}
-                onChange={(e) => setSettings({ ...settings, renderingMode: e.target.value as GameSettings['renderingMode'] })}
-                className="w-full bg-gray-800 border border-white/20 rounded px-3 py-1.5 text-sm text-white focus:outline-none focus:border-white/40"
-              >
-                <option value="prototype">{t.worldSetup.renderingModePrototype}</option>
-                <option value="modern">{t.worldSetup.renderingModeModern}</option>
-              </select>
-            </label>
-          </div>
         </div>
 
         <div className="flex gap-3 mt-6">

@@ -2,9 +2,8 @@ import * as THREE from 'three';
 
 // HEX_SIZE - радиус гексагона для pointy-top ориентации
 export const HEX_SIZE = 1;
-export const HEX_HEIGHT = 2; // Высота блоков
-// Для pointy-top: hexWidth = √3 * size, hexHeight = 2 * size
-export const HEX_WIDTH = Math.sqrt(3) * HEX_SIZE; // Ширина гексагона
+export const HEX_WIDTH = Math.sqrt(3) * HEX_SIZE; // Ширина гексагона = √3 * size
+export const HEX_HEIGHT = HEX_WIDTH; // Высота = ширине для квадратного вида
 export const HEX_RADIUS = HEX_SIZE; // Радиус = size для pointy-top
 
 export interface HexCoords {
@@ -81,8 +80,8 @@ export function createHexGeometryWithUV(): THREE.BufferGeometry {
     const z = Math.sin(angle) * radius;
     vertices.push(x, height / 2, z);
     normals.push(0, 1, 0);
-    // UV для верхней грани (центр в 0.5, 0.5) - без поворота для правильного наложения текстуры
-    const uvAngle = (i / segments) * Math.PI * 2;
+    // UV для верхней грани (центр в 0.5, 0.5) - с тем же поворотом что и вершины
+    const uvAngle = (i / segments) * Math.PI * 2 + rotationOffset;
     const u = 0.5 + Math.cos(uvAngle) * 0.5;
     const v = 0.5 + Math.sin(uvAngle) * 0.5;
     uvs.push(u, v);

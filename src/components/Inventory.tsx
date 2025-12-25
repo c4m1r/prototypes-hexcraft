@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Item, InventorySlot, Player } from '../types/game';
+import { Item, InventorySlot, EquipmentSlot as EquipmentSlotType, Player } from '../types/game';
 
 interface InventoryProps {
   isOpen: boolean;
@@ -7,6 +7,7 @@ interface InventoryProps {
   playerState: any; // TODO: типизировать
   onInventoryChange: (inventory: InventorySlot[]) => void;
   onHotbarChange: (hotbar: InventorySlot[]) => void;
+  onEquipmentChange: (equipment: EquipmentSlot[]) => void;
   onItemPickup?: (item: Item) => void;
 }
 
@@ -19,10 +20,12 @@ const Inventory: React.FC<InventoryProps> = ({
   playerState,
   onInventoryChange,
   onHotbarChange,
+  onEquipmentChange,
   onItemPickup
 }) => {
   const [draggedItem, setDraggedItem] = useState<{ item: Item; count: number; fromSlot: number; fromType: 'inventory' | 'hotbar' } | null>(null);
   const [dragOverSlot, setDragOverSlot] = useState<number | null>(null);
+  const [tooltip, setTooltip] = useState<{ item: Item; x: number; y: number } | null>(null);
   // Динамический список игроков (в будущем можно подключить к реальному серверу)
   const [players] = useState<Player[]>([
     { id: '1', name: playerState?.name || 'Player', position: { x: 0, y: 0, z: 0 }, isOnline: true },
@@ -98,6 +101,17 @@ const Inventory: React.FC<InventoryProps> = ({
         className={`hexagon-slot ${isDragOver ? 'drag-over' : ''} ${isDraggedFrom ? 'dragged-from' : ''}`}
         onClick={(e) => onClick(e, index, type)}
         onContextMenu={(e) => onClick(e, index, type)}
+        onMouseEnter={(e) => {
+          if (slot.item) {
+            const rect = e.currentTarget.getBoundingClientRect();
+            setTooltip({
+              item: slot.item,
+              x: rect.left + rect.width / 2,
+              y: rect.top - 10
+            });
+          }
+        }}
+        onMouseLeave={() => setTooltip(null)}
         onDragOver={(e) => {
           e.preventDefault();
           setDragOverSlot(index);
@@ -107,7 +121,7 @@ const Inventory: React.FC<InventoryProps> = ({
           e.preventDefault();
           setDragOverSlot(null);
           if (draggedItem) {
-            handleDrop(index, type);
+            handleDrop(index, type, draggedItem);
           }
         }}
         draggable={!!slot.item}
@@ -159,15 +173,14 @@ const Inventory: React.FC<InventoryProps> = ({
     }
   }, [playerState, onInventoryChange, onHotbarChange]);
 
-  const handleDrop = useCallback((toIndex: number, toType: 'inventory' | 'hotbar') => {
-    if (!draggedItem) return;
+  const handleDrop = useCallback((toIndex: number, toType: 'inventory' | 'hotbar', draggedItemParam: typeof draggedItem) => {
+    if (!draggedItemParam) return;
 
-    const fromInventory = draggedItem.fromType === 'inventory' ? playerState.inventory : playerState.hotbar;
+    const fromInventory = draggedItemParam.fromType === 'inventory' ? playerState.inventory : playerState.hotbar;
     const toInventory = toType === 'inventory' ? playerState.inventory : playerState.hotbar;
 
     // Если перетаскиваем в тот же слот - ничего не делаем
-    if (draggedItem.fromSlot === toIndex && draggedItem.fromType === toType) {
-      setDraggedItem(null);
+    if (draggedItemParam.fromSlot === toIndex && draggedItemParam.fromType === toType) {
       return;
     }
 
@@ -178,32 +191,32 @@ const Inventory: React.FC<InventoryProps> = ({
     const targetSlot = newToInventory[toIndex];
 
     // Если целевой слот занят тем же предметом - складываем
-    if (targetSlot.item && targetSlot.item.id === draggedItem.item.id) {
-      const maxStackSize = draggedItem.item.maxStackSize;
+    if (targetSlot.item && targetSlot.item.id === draggedItemParam.item.id) {
+      const maxStackSize = draggedItemParam.item.maxStackSize;
       const currentCount = targetSlot.count;
-      const draggedCount = draggedItem.count;
+      const draggedCount = draggedItemParam.count;
       const totalCount = currentCount + draggedCount;
 
       if (totalCount <= maxStackSize) {
         // Весь стаск помещается
-        newToInventory[toIndex] = { item: draggedItem.item, count: totalCount };
-        newFromInventory[draggedItem.fromSlot] = { item: null, count: 0 };
+        newToInventory[toIndex] = { item: draggedItemParam.item, count: totalCount };
+        newFromInventory[draggedItemParam.fromSlot] = { item: null, count: 0 };
       } else {
         // Частично помещается
-        newToInventory[toIndex] = { item: draggedItem.item, count: maxStackSize };
-        newFromInventory[draggedItem.fromSlot] = {
-          item: draggedItem.item,
+        newToInventory[toIndex] = { item: draggedItemParam.item, count: maxStackSize };
+        newFromInventory[draggedItemParam.fromSlot] = {
+          item: draggedItemParam.item,
           count: totalCount - maxStackSize
         };
       }
     } else {
       // Обмен предметами или перемещение в пустой слот
-      newFromInventory[draggedItem.fromSlot] = targetSlot;
-      newToInventory[toIndex] = { item: draggedItem.item, count: draggedItem.count };
+      newFromInventory[draggedItemParam.fromSlot] = targetSlot;
+      newToInventory[toIndex] = { item: draggedItemParam.item, count: draggedItemParam.count };
     }
 
     // Обновляем инвентари
-    if (draggedItem.fromType === 'inventory') {
+    if (draggedItemParam.fromType === 'inventory') {
       onInventoryChange(newFromInventory);
     } else {
       onHotbarChange(newFromInventory);
@@ -214,11 +227,29 @@ const Inventory: React.FC<InventoryProps> = ({
     } else {
       onHotbarChange(newToInventory);
     }
-
-    setDraggedItem(null);
   }, [draggedItem, playerState, onInventoryChange, onHotbarChange]);
 
   if (!isOpen) return null;
+
+  // Компонент слота экипировки
+  const EquipmentSlot: React.FC<{
+    slot: EquipmentSlotType;
+    onClick: () => void;
+  }> = ({ slot, onClick }) => {
+    return (
+      <div className="equipment-slot" onClick={onClick}>
+        <div className="equipment-slot-content">
+          {slot.item && (
+            <div
+              className="equipment-item-icon"
+              style={{ backgroundColor: slot.item.color || '#666' }}
+            />
+          )}
+        </div>
+        <div className="equipment-slot-name">{slot.name}</div>
+      </div>
+    );
+  };
 
   return (
     <div className="inventory-overlay" onClick={onClose}>
@@ -253,16 +284,70 @@ const Inventory: React.FC<InventoryProps> = ({
             </div>
           </div>
 
-          {/* Персонаж */}
-          <div className="character-panel">
-            <div className="character-preview">
-              <div className="character-body">
-                <div className="character-head"></div>
-                <div className="character-torso"></div>
-                <div className="character-legs"></div>
+          {/* Персонаж и экипировка */}
+          <div className="character-equipment-panel">
+            {/* Экипировка - левая сторона */}
+            <div className="equipment-panel">
+              {/* Шлем и артефакты */}
+              <div className="equipment-row">
+                <EquipmentSlot
+                  slot={playerState.equipment?.[0] || { type: 'helmet', item: null, name: 'Helmet' }}
+                  onClick={() => {}}
+                />
+                <EquipmentSlot
+                  slot={playerState.equipment?.[5] || { type: 'artifact1', item: null, name: 'Artifact 1' }}
+                  onClick={() => {}}
+                />
+              </div>
+
+              {/* Нагрудник и плащ */}
+              <div className="equipment-row">
+                <EquipmentSlot
+                  slot={playerState.equipment?.[1] || { type: 'chestplate', item: null, name: 'Chestplate' }}
+                  onClick={() => {}}
+                />
+                <EquipmentSlot
+                  slot={playerState.equipment?.[4] || { type: 'cape', item: null, name: 'Cape' }}
+                  onClick={() => {}}
+                />
+              </div>
+
+              {/* Поножи и артефакт */}
+              <div className="equipment-row">
+                <EquipmentSlot
+                  slot={playerState.equipment?.[2] || { type: 'leggings', item: null, name: 'Leggings' }}
+                  onClick={() => {}}
+                />
+                <EquipmentSlot
+                  slot={playerState.equipment?.[6] || { type: 'artifact2', item: null, name: 'Artifact 2' }}
+                  onClick={() => {}}
+                />
+              </div>
+
+              {/* Ботинки и артефакт */}
+              <div className="equipment-row">
+                <EquipmentSlot
+                  slot={playerState.equipment?.[3] || { type: 'boots', item: null, name: 'Boots' }}
+                  onClick={() => {}}
+                />
+                <EquipmentSlot
+                  slot={playerState.equipment?.[7] || { type: 'artifact3', item: null, name: 'Artifact 3' }}
+                  onClick={() => {}}
+                />
               </div>
             </div>
-            <div className="character-name">{playerState?.name || 'Player'}</div>
+
+            {/* Персонаж - центр */}
+            <div className="character-panel">
+              <div className="character-preview">
+                <div className="character-body">
+                  <div className="character-head"></div>
+                  <div className="character-torso"></div>
+                  <div className="character-legs"></div>
+                </div>
+              </div>
+              <div className="character-name">{playerState?.name || 'Player'}</div>
+            </div>
           </div>
 
           {/* Инвентарь */}
@@ -295,6 +380,26 @@ const Inventory: React.FC<InventoryProps> = ({
             ))}
           </div>
         </div>
+
+        {/* Tooltip */}
+        {tooltip && (
+          <div
+            className="item-tooltip"
+            style={{
+              left: tooltip.x,
+              top: tooltip.y
+            }}
+          >
+            <div className="item-tooltip-name">{tooltip.item.name}</div>
+            <div className="item-tooltip-type">{tooltip.item.type}</div>
+            <div className="item-tooltip-rarity" data-rarity={tooltip.item.rarity}>
+              {tooltip.item.rarity}
+            </div>
+            {tooltip.item.maxStackSize > 1 && (
+              <div className="item-tooltip-stack">Stack: {tooltip.item.maxStackSize}</div>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );

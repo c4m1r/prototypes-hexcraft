@@ -17,7 +17,6 @@ export interface GameSettings {
 export interface WorldSetup {
   playerName: string;
   gameMode: GameMode;
-  renderingMode: RenderingMode;
   seed: number;
 }
 

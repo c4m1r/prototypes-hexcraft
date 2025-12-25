@@ -90,6 +90,22 @@ export class World {
     this.updateFogDensity();
   }
 
+  setRenderingMode(mode: RenderingMode): void {
+    if (this.renderingMode === mode) return;
+
+    this.renderingMode = mode;
+    console.log(`[World] Switching to ${mode} rendering mode`);
+
+    // Переинициализируем материалы для нового режима
+    this.initializeMaterials();
+
+    // Пересоздаем все видимые меши
+    for (const [key, chunk] of this.chunks) {
+      this.removeChunkMeshes(key);
+      this.createChunkMeshes(chunk);
+    }
+  }
+
   private initializeMaterials(): void {
     BLOCK_TYPES.forEach(blockType => {
       if (this.renderingMode === 'modern' && this.textureManager) {

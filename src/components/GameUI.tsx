@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import Inventory from './Inventory';
-import { InventorySlot } from '../types/game';
+import { InventorySlot, EquipmentSlot } from '../types/game';
 import './Inventory.css';
 
 interface GameUIProps {
@@ -21,6 +21,7 @@ interface GameUIProps {
   onInventoryToggle: () => void;
   onInventoryChange: (inventory: InventorySlot[]) => void;
   onHotbarChange: (hotbar: InventorySlot[]) => void;
+  onEquipmentChange: (equipment: EquipmentSlot[]) => void;
 }
 
 export function GameUI({
@@ -40,7 +41,8 @@ export function GameUI({
   inventoryOpen,
   onInventoryToggle,
   onInventoryChange,
-  onHotbarChange
+  onHotbarChange,
+  onEquipmentChange
 }: GameUIProps) {
   const [helpVisible, setHelpVisible] = useState(showHelpHint);
 
@@ -130,6 +132,7 @@ export function GameUI({
         playerState={playerState}
         onInventoryChange={onInventoryChange}
         onHotbarChange={onHotbarChange}
+        onEquipmentChange={onEquipmentChange}
       />
 
       {showDebug ? (
@@ -178,6 +181,7 @@ export function GameUI({
           <div>E - Pickup Items</div>
           <div>1-9,0 - Select Block</div>
           <div>TAB - Inventory</div>
+          <div>F2 - Toggle Rendering Mode</div>
           <div>~ - Toggle Debug</div>
           <div>F - Toggle Fog Barrier</div>
           <div>ESC - Menu</div>

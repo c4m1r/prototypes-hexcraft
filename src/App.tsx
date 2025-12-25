@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Game, GameState } from './game/Game';
-import { InventorySlot } from './types/game';
+import { InventorySlot, EquipmentSlot } from './types/game';
 import { GameUI } from './components/GameUI';
 import { MainMenu } from './components/MainMenu';
 import { AboutPage } from './components/AboutPage';
@@ -41,12 +41,14 @@ function App() {
     playerState: {
       name: 'Player',
       inventory: [],
-      hotbar: []
+      hotbar: [],
+      equipment: []
     },
     droppedItems: []
   });
 
   const [inventoryOpen, setInventoryOpen] = useState(false);
+  const [renderingMode, setRenderingMode] = useState<'prototype' | 'modern'>('prototype');
 
   // Обработчики инвентаря
   const handleInventoryChange = (inventory: InventorySlot[]) => {
@@ -69,6 +71,17 @@ function App() {
       }
     }));
     gameRef.current?.updateHotbar(hotbar);
+  };
+
+  const handleEquipmentChange = (equipment: EquipmentSlot[]) => {
+    setGameState(prev => ({
+      ...prev,
+      playerState: {
+        ...prev.playerState,
+        equipment
+      }
+    }));
+    gameRef.current?.updateEquipment(equipment);
   };
 
   // Обработчик открытия/закрытия инвентаря
@@ -97,28 +110,20 @@ function App() {
         setGameState(state);
       }, settingsRef.current);
 
-      // Размещаем игрока на правильной высоте после создания игры
-      // Используем сохраненную позицию спавна из handleWorldSetupStart
-      const spawnPos = (window as any).__spawnPosition;
-      if (spawnPos) {
-        // Yield к браузеру перед размещением игрока
-        requestAnimationFrame(() => {
-          if (gameRef.current) {
-            gameRef.current.setPlayerPosition(spawnPos.x, spawnPos.y, spawnPos.z);
-          }
-          // Очищаем временную переменную
-          delete (window as any).__spawnPosition;
-        });
-      } else {
-        // Fallback: используем старый метод если позиция не была сохранена
-        const spawnPos = hexToWorld(0, 0, 0);
-        gameRef.current.setPlayerPosition(spawnPos.x, 10, spawnPos.z);
-      }
+      // Простое размещение игрока на блоке (0,0) на высоте 10
+      const spawnPos = hexToWorld(0, 0, 0);
+      gameRef.current.setPlayerPosition(spawnPos.x, 10, spawnPos.z);
 
       const handleKeyDown = (e: KeyboardEvent) => {
         if (e.code === 'Backquote') {
           e.preventDefault();
           setShowDebug(prev => !prev);
+        }
+        if (e.key === 'F2') {
+          e.preventDefault();
+          const newMode = renderingMode === 'prototype' ? 'modern' : 'prototype';
+          setRenderingMode(newMode);
+          gameRef.current?.setRenderingMode(newMode);
         }
         if (e.code === 'Escape') {
           setCurrentScreen('menu');
@@ -185,25 +190,18 @@ function App() {
     setLoadingProgress(85);
     setLoadingStatus('Размещение игрока...');
 
-    // 6. Вычисляем позицию спавна игрока
-    const spawnPos = hexToWorld(0, 0, 0);
-    const finalY = spawnHeight + 1.7; // Добавляем высоту игрока
-
-    // 7. Очищаем временную сцену
+    // Очищаем временную сцену
     tempScene.clear();
 
-    // 8. Yield к браузеру перед переключением экрана
+    // Yield к браузеру перед переключением экрана
     await new Promise<void>(resolve => requestAnimationFrame(() => resolve()));
 
     setLoadingProgress(100);
     setLoadingStatus('Запуск игры...');
 
-    // 9. Переключаемся на игровой экран
+    // Переключаемся на игровой экран
     setShowHelpHint(true);
     setCurrentScreen('game');
-    
-    // Сохраняем позицию спавна для использования в useEffect
-    (window as any).__spawnPosition = { x: spawnPos.x, y: finalY, z: spawnPos.z };
   };
 
   const handleWorldSetupBack = () => {
@@ -298,6 +296,7 @@ function App() {
             onInventoryToggle={handleInventoryToggle}
             onInventoryChange={handleInventoryChange}
             onHotbarChange={handleHotbarChange}
+            onEquipmentChange={handleEquipmentChange}
           />
         </>
       )}
