@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { World } from './World';
 import { Block, BLOCK_TYPES } from '../types/game';
-import { worldToHex, hexToWorld, HEX_RADIUS, HEX_HEIGHT } from '../utils/hexUtils';
+import { worldToHex, hexToWorld, HEX_RADIUS, HEX_HEIGHT, createHexGeometry } from '../utils/hexUtils';
 
 export interface RaycastResult {
   block: Block;
