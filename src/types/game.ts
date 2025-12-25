@@ -36,6 +36,11 @@ export const BLOCK_TYPES: BlockType[] = [
   { id: 'snow', name: 'Snow', color: '#e8f2f7' },
   { id: 'ice', name: 'Ice', color: '#b8d8e8' },
   { id: 'lava', name: 'Lava', color: '#ff4500' },
+  { id: 'bronze', name: 'Bronze', color: '#cd7f32' },
+  { id: 'silver', name: 'Silver', color: '#c0c0c0' },
+  { id: 'gold', name: 'Gold', color: '#ffd700' },
+  { id: 'red_mushroom', name: 'Red Mushroom', color: '#dc143c' },
+  { id: 'mushroom', name: 'Mushroom', color: '#8b4513' },
 ];
 
 export const BIOMES = ['plains', 'forest', 'desert', 'tundra', 'volcano'];

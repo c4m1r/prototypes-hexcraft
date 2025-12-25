@@ -91,17 +91,12 @@ export class World {
         if (material) {
           this.materials.set(blockType.id, material);
         } else {
-          // Fallback на цветной материал (если нет текстуры в атласе)
-          const isLeaves = blockType.id === 'leaves';
-          const isWater = blockType.id === 'water';
-          const isLava = blockType.id === 'lava';
+          // Fallback на фиолетовый материал (error debug) для блоков без текстуры в атласе
           this.materials.set(
             blockType.id,
             new THREE.MeshLambertMaterial({
-              color: blockType.color,
-              transparent: isLeaves || isWater || isLava,
-              opacity: isLeaves ? 0.75 : (isWater ? 0.7 : (isLava ? 1 : 1)),
-              side: (isLeaves || isWater || isLava) ? THREE.DoubleSide : THREE.FrontSide
+              color: 0xff00ff, // Фиолетовый цвет для блоков без текстуры
+              side: THREE.DoubleSide
             })
           );
         }

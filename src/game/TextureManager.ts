@@ -53,7 +53,8 @@ export class TextureManager {
     // Ряд 1: grass-top, grass, dirt, stone, sand, snow, ice, bronze, silver, gold
     this.blockConfigs.set('grass', {
       top: { row: 0, col: 0 }, // grass-top
-      side: { row: 0, col: 1 } // grass
+      side: { row: 0, col: 1 }, // grass
+      transparent: false // Grass не прозрачный
     });
     this.blockConfigs.set('dirt', {
       top: { row: 0, col: 2 }, // dirt
@@ -104,6 +105,30 @@ export class TextureManager {
       side: { row: 2, col: 1 }, // leaves
       transparent: true,
       opacity: 0.75
+    });
+
+    // Ряд 1: дополнительные блоки
+    this.blockConfigs.set('bronze', {
+      top: { row: 0, col: 7 }, // bronze
+      side: { row: 0, col: 7 } // bronze
+    });
+    this.blockConfigs.set('silver', {
+      top: { row: 0, col: 8 }, // silver
+      side: { row: 0, col: 8 } // silver
+    });
+    this.blockConfigs.set('gold', {
+      top: { row: 0, col: 9 }, // gold
+      side: { row: 0, col: 9 } // gold
+    });
+
+    // Ряд 4: природа
+    this.blockConfigs.set('red_mushroom', {
+      top: { row: 3, col: 0 }, // red mushroom
+      side: { row: 3, col: 0 } // red mushroom
+    });
+    this.blockConfigs.set('mushroom', {
+      top: { row: 3, col: 1 }, // mushroom
+      side: { row: 3, col: 1 } // mushroom
     });
   }
 
@@ -172,18 +197,12 @@ export class TextureManager {
 
   createMaterial(blockId: string, time: number = 0, fallbackColor?: string): THREE.MeshLambertMaterial | THREE.ShaderMaterial | null {
     const config = this.blockConfigs.get(blockId);
-    // Если нет конфигурации или атласа, возвращаем fallback цветной материал
+    // Если нет конфигурации или атласа, возвращаем fallback фиолетовый материал (error debug)
     if (!config || !this.atlasTexture) {
-      if (fallbackColor) {
-        const isLeaves = blockId === 'leaves';
-        return new THREE.MeshLambertMaterial({
-          color: fallbackColor,
-          transparent: isLeaves || blockId === 'water' || blockId === 'lava',
-          opacity: isLeaves ? 0.75 : (blockId === 'water' ? 0.7 : (blockId === 'lava' ? 1 : 1)),
-          side: (isLeaves || blockId === 'water' || blockId === 'lava') ? THREE.DoubleSide : THREE.FrontSide
-        });
-      }
-      return null;
+      return new THREE.MeshLambertMaterial({
+        color: 0xff00ff, // Фиолетовый цвет для блоков без текстуры
+        side: THREE.DoubleSide
+      });
     }
 
     let topTexture: THREE.Texture;
@@ -215,9 +234,10 @@ export class TextureManager {
     const texturesDifferent = hasTopTexture && (config.top.row !== config.side.row || config.top.col !== config.side.col);
     const useCustomShader = texturesDifferent;
 
-    // Включаем прозрачность только если она задана в конфиге или если текстура имеет альфа-канал
+    // Включаем прозрачность только если она явно задана в конфиге
     // Для leaves, water, lava всегда включаем прозрачность
-    const shouldBeTransparent = config.transparent || blockId === 'leaves' || blockId === 'water' || blockId === 'lava';
+    // Для остальных блоков прозрачность определяется только конфигом
+    const shouldBeTransparent = (config.transparent === true) || blockId === 'leaves' || blockId === 'water' || blockId === 'lava';
     
     if (useCustomShader) {
       return this.createDualTextureMaterial(topTexture, sideTexture, config, shouldBeTransparent);
@@ -227,8 +247,8 @@ export class TextureManager {
         map: sideTexture,
         transparent: shouldBeTransparent,
         opacity: config.opacity !== undefined ? config.opacity : 1,
-        side: shouldBeTransparent ? THREE.DoubleSide : THREE.FrontSide,
-        alphaTest: shouldBeTransparent ? 0.1 : 0 // Используем альфа-канал из текстуры
+        side: THREE.DoubleSide, // Всегда DoubleSide для правильного отображения с обеих сторон
+        alphaTest: shouldBeTransparent ? 0.1 : 1.0 // Для непрозрачных блоков игнорируем альфа-канал (alphaTest > 0.99)
       });
 
       (material as any).topTexture = sideTexture; // Используем side как fallback
@@ -305,8 +325,8 @@ export class TextureManager {
       vertexShader,
       fragmentShader,
       transparent: transparent,
-      side: transparent ? THREE.DoubleSide : THREE.FrontSide,
-      alphaTest: transparent ? 0.1 : 0 // Используем альфа-канал из текстуры
+      side: THREE.DoubleSide, // Всегда DoubleSide для правильного отображения с обеих сторон
+      alphaTest: transparent ? 0.1 : 1.0 // Для непрозрачных блоков игнорируем альфа-канал (alphaTest > 0.99)
     });
 
     return material;

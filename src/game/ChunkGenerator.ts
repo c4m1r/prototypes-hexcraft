@@ -25,7 +25,7 @@ export class ChunkGenerator {
         const height = this.getHeight(worldQ, worldR, biome);
 
         for (let y = 0; y < height; y++) {
-          const blockType = this.getBlockType(y, height, biome);
+          const blockType = this.getBlockType(y, height, biome, worldQ, worldR);
           blocks.push({
             type: blockType,
             position: { q: worldQ, r: worldR, s, y }
@@ -34,6 +34,18 @@ export class ChunkGenerator {
 
         if ((biome === 'forest' || biome === 'plains') && height > 0) {
           this.addTree(blocks, worldQ, worldR, s, height, biome);
+        }
+
+        // Добавляем грибы в лесу
+        if (biome === 'forest' && height > 0) {
+          const mushroomChance = this.simpleNoise(worldQ * 0.2, worldR * 0.2);
+          if (mushroomChance > 0.95) {
+            const mushroomType = this.simpleNoise(worldQ * 0.3, worldR * 0.3) > 0.5 ? 'red_mushroom' : 'mushroom';
+            blocks.push({
+              type: mushroomType,
+              position: { q: worldQ, r: worldR, s, y: height }
+            });
+          }
         }
       }
     }
@@ -76,7 +88,7 @@ export class ChunkGenerator {
     }
   }
 
-  private getBlockType(y: number, height: number, biome: string): string {
+  private getBlockType(y: number, height: number, biome: string, q: number, r: number): string {
     if (y === height - 1) {
       switch (biome) {
         case 'plains':
@@ -95,6 +107,22 @@ export class ChunkGenerator {
     } else if (y >= height - 3) {
       return biome === 'desert' ? 'sand' : 'dirt';
     } else {
+      // Глубокие слои - могут быть руды
+      const oreNoise = this.simpleNoise(q * 0.05, r * 0.05);
+      if (oreNoise > 0.85 && y < height - 5) {
+        // Редкие руды в глубоких слоях
+        const oreType = Math.floor(oreNoise * 3) % 3;
+        switch (oreType) {
+          case 0:
+            return 'bronze';
+          case 1:
+            return 'silver';
+          case 2:
+            return 'gold';
+          default:
+            return 'stone';
+        }
+      }
       return 'stone';
     }
   }
