@@ -110,66 +110,18 @@ export class TextureManager {
   private prepareAnimatedTextures(): void {
     if (!this.atlasTexture) return;
 
-    const image = this.atlasTexture.image as HTMLImageElement;
-    const canvas = document.createElement('canvas');
-    canvas.width = this.config.tileSize;
-    canvas.height = this.config.tileSize;
-    const ctx = canvas.getContext('2d')!;
-
-    // Подготовка анимированных текстур для лавы
+    // Подготовка анимированных текстур для лавы (ряд 1, колонки 0-2)
     const lavaFrames: THREE.DataTexture[] = [];
     for (let i = 0; i < 3; i++) {
-      ctx.clearRect(0, 0, this.config.tileSize, this.config.tileSize);
-      ctx.drawImage(
-        image,
-        i * this.config.tileSize,
-        1 * this.config.tileSize,
-        this.config.tileSize,
-        this.config.tileSize,
-        0,
-        0,
-        this.config.tileSize,
-        this.config.tileSize
-      );
-      const imageData = ctx.getImageData(0, 0, this.config.tileSize, this.config.tileSize);
-      const texture = new THREE.DataTexture(
-        imageData.data,
-        this.config.tileSize,
-        this.config.tileSize,
-        THREE.RGBAFormat
-      );
-      texture.magFilter = THREE.NearestFilter;
-      texture.minFilter = THREE.NearestFilter;
-      texture.needsUpdate = true;
+      const texture = this.extractTextureFromAtlas(1, i);
       lavaFrames.push(texture);
     }
     this.animatedTextures.set('lava', lavaFrames);
 
-    // Подготовка анимированных текстур для воды
+    // Подготовка анимированных текстур для воды (ряд 1, колонки 3-5)
     const waterFrames: THREE.DataTexture[] = [];
     for (let i = 0; i < 3; i++) {
-      ctx.clearRect(0, 0, this.config.tileSize, this.config.tileSize);
-      ctx.drawImage(
-        image,
-        (3 + i) * this.config.tileSize,
-        1 * this.config.tileSize,
-        this.config.tileSize,
-        this.config.tileSize,
-        0,
-        0,
-        this.config.tileSize,
-        this.config.tileSize
-      );
-      const imageData = ctx.getImageData(0, 0, this.config.tileSize, this.config.tileSize);
-      const texture = new THREE.DataTexture(
-        imageData.data,
-        this.config.tileSize,
-        this.config.tileSize,
-        THREE.RGBAFormat
-      );
-      texture.magFilter = THREE.NearestFilter;
-      texture.minFilter = THREE.NearestFilter;
-      texture.needsUpdate = true;
+      const texture = this.extractTextureFromAtlas(1, 3 + i);
       waterFrames.push(texture);
     }
     this.animatedTextures.set('water', waterFrames);
@@ -181,6 +133,41 @@ export class TextureManager {
     const uSize = 1 / this.config.cols;
     const vSize = 1 / this.config.rows;
     return { u, v, uSize, vSize };
+  }
+
+  private extractTextureFromAtlas(row: number, col: number): THREE.DataTexture {
+    if (!this.atlasTexture) {
+      throw new Error('Atlas texture not loaded');
+    }
+
+    const image = this.atlasTexture.image as HTMLImageElement;
+    const canvas = document.createElement('canvas');
+    canvas.width = this.config.tileSize;
+    canvas.height = this.config.tileSize;
+    const ctx = canvas.getContext('2d')!;
+
+    // Вырезаем нужный квадрат из атласа
+    const sourceX = col * this.config.tileSize;
+    const sourceY = row * this.config.tileSize;
+
+    ctx.drawImage(
+      image,
+      sourceX, sourceY, this.config.tileSize, this.config.tileSize, // источник
+      0, 0, this.config.tileSize, this.config.tileSize // назначение
+    );
+
+    const imageData = ctx.getImageData(0, 0, this.config.tileSize, this.config.tileSize);
+    const texture = new THREE.DataTexture(
+      imageData.data,
+      this.config.tileSize,
+      this.config.tileSize,
+      THREE.RGBAFormat
+    );
+    texture.magFilter = THREE.NearestFilter;
+    texture.minFilter = THREE.NearestFilter;
+    texture.needsUpdate = true;
+
+    return texture;
   }
 
   createMaterial(blockId: string, time: number = 0, fallbackColor?: string): THREE.MeshLambertMaterial | THREE.ShaderMaterial | null {
@@ -210,17 +197,23 @@ export class TextureManager {
       topTexture = frames[frameIndex];
       sideTexture = frames[frameIndex];
     } else {
-      const topUV = this.getUVCoordinates(config.top.row, config.top.col);
-      const sideUV = this.getUVCoordinates(config.side.row, config.side.col);
-
-      topTexture = this.createTextureFromAtlas(topUV);
-      sideTexture = this.createTextureFromAtlas(sideUV);
+      // Используем side для top, если top не задан или совпадает с side
+      const useTopTexture = config.top.row !== undefined && config.top.col !== undefined &&
+                            (config.top.row !== config.side.row || config.top.col !== config.side.col);
+      
+      if (useTopTexture) {
+        topTexture = this.getTextureFromAtlas(config.top.row, config.top.col);
+      } else {
+        // Если top не задан, используем side
+        topTexture = this.getTextureFromAtlas(config.side.row, config.side.col);
+      }
+      sideTexture = this.getTextureFromAtlas(config.side.row, config.side.col);
     }
 
-    // Если top текстура не задана или текстуры одинаковые, используем side для обеих
+    // Проверяем, нужно ли использовать разные текстуры для top и side
     const hasTopTexture = config.top.row !== undefined && config.top.col !== undefined;
-    const texturesDifferent = config.top.row !== config.side.row || config.top.col !== config.side.col;
-    const useCustomShader = hasTopTexture && texturesDifferent;
+    const texturesDifferent = hasTopTexture && (config.top.row !== config.side.row || config.top.col !== config.side.col);
+    const useCustomShader = texturesDifferent;
 
     // Включаем прозрачность только если она задана в конфиге или если текстура имеет альфа-канал
     // Для leaves, water, lava всегда включаем прозрачность
@@ -281,7 +274,7 @@ export class TextureManager {
         vec4 topColor = texture2D(topTexture, vUv);
         vec4 sideColor = texture2D(sideTexture, vUv);
         
-        // Смешиваем текстуры в зависимости от нормали
+        // Смешиваем текстуры в зависимости от нормали с плавным переходом
         vec4 color = mix(sideColor, topColor, smoothstep(0.7, 1.0, topFactor));
         
         // Lambert освещение
@@ -319,16 +312,17 @@ export class TextureManager {
     return material;
   }
 
-  private createTextureFromAtlas(uv: { u: number; v: number; uSize: number; vSize: number }): THREE.Texture {
-    if (!this.atlasTexture) {
-      throw new Error('Atlas texture not loaded');
+  // Кэш для созданных текстур
+  private textureCache: Map<string, THREE.DataTexture> = new Map();
+
+  private getTextureFromAtlas(row: number, col: number): THREE.DataTexture {
+    const cacheKey = `${row}-${col}`;
+    if (this.textureCache.has(cacheKey)) {
+      return this.textureCache.get(cacheKey)!;
     }
 
-    const texture = this.atlasTexture.clone();
-    texture.offset.set(uv.u, 1 - uv.v - uv.vSize);
-    texture.repeat.set(uv.uSize, uv.vSize);
-    // Включаем использование альфа-канала из текстуры
-    texture.format = THREE.RGBAFormat;
+    const texture = this.extractTextureFromAtlas(row, col);
+    this.textureCache.set(cacheKey, texture);
     return texture;
   }
 
