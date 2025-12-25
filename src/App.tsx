@@ -31,6 +31,7 @@ function App() {
     playerPosition: { x: 0, y: 0, z: 0 },
     isFlying: true,
     targetBlock: null,
+    targetBiome: null,
     showFogBarrier: true,
     currentTime: '06:00',
     health: 100,
@@ -48,7 +49,7 @@ function App() {
   });
 
   const [inventoryOpen, setInventoryOpen] = useState(false);
-  const [renderingMode, setRenderingMode] = useState<'prototype' | 'modern'>('prototype');
+  const [renderingMode, setRenderingMode] = useState<'prototype' | 'modern'>('modern');
 
   // Обработчики инвентаря
   const handleInventoryChange = (inventory: InventorySlot[]) => {
@@ -110,9 +111,12 @@ function App() {
         setGameState(state);
       }, settingsRef.current);
 
-      // Простое размещение игрока на блоке (0,0) на высоте 10
+      // Размещаем игрока на 1 блок выше самого верхнего блока
+      const tempWorld = new (await import('./game/World')).World(new THREE.Scene());
+      const spawnHeight = tempWorld.getHighestBlockAt(0, 0);
+      const finalHeight = spawnHeight !== null ? spawnHeight + 1.7 : 10; // Высота игрока + отступ
       const spawnPos = hexToWorld(0, 0, 0);
-      gameRef.current.setPlayerPosition(spawnPos.x, 10, spawnPos.z);
+      gameRef.current.setPlayerPosition(spawnPos.x, finalHeight, spawnPos.z);
 
       const handleKeyDown = (e: KeyboardEvent) => {
         if (e.code === 'Backquote') {
@@ -122,8 +126,19 @@ function App() {
         if (e.key === 'F2') {
           e.preventDefault();
           const newMode = renderingMode === 'prototype' ? 'modern' : 'prototype';
+          console.log('Switching rendering mode to:', newMode);
           setRenderingMode(newMode);
-          gameRef.current?.setRenderingMode(newMode);
+          if (gameRef.current) {
+            gameRef.current.setRenderingMode(newMode);
+            console.log('Rendering mode switched successfully');
+          } else {
+            console.log('Game ref not available');
+          }
+        }
+        if (e.key === 'F') {
+          e.preventDefault();
+          // Toggle fog barrier
+          gameRef.current?.toggleFogBarrier();
         }
         if (e.code === 'Escape') {
           setCurrentScreen('menu');
@@ -283,6 +298,7 @@ function App() {
             playerPosition={gameState.playerPosition}
             isFlying={gameState.isFlying}
             targetBlock={gameState.targetBlock}
+            targetBiome={gameState.targetBiome}
             showFogBarrier={gameState.showFogBarrier}
             currentTime={gameState.currentTime}
             showHelpHint={showHelpHint}

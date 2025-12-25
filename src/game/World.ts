@@ -579,6 +579,14 @@ export class World {
     return this.getBlockAt(hex.q, hex.r, blockY)?.type || null;
   }
 
+  getBiomeAt(x: number, z: number): string | null {
+    const hex = worldToHex(x, z);
+    const chunkPos = worldToChunk(x, z, this.chunkSize);
+    const key = getChunkKey(chunkPos.q, chunkPos.r);
+    const chunk = this.chunks.get(key);
+    return chunk ? chunk.biome : null;
+  }
+
   isPassable(blockType: string): boolean {
     return blockType === 'leaves' || blockType === 'water' || blockType === 'lava';
   }

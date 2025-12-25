@@ -76,6 +76,56 @@ export interface Translations {
   gameUI: {
     helpHint: string;
     debug: string;
+    move: string;
+    toggleFlyWalk: string;
+    jumpWalk: string;
+    downFly: string;
+    breakBlock: string;
+    placeBlock: string;
+    pickupItems: string;
+    selectBlock: string;
+    inventory: string;
+    toggleRenderingMode: string;
+    toggleDebug: string;
+    toggleFogBarrier: string;
+    closeMenu: string;
+    time: string;
+    generationCode: string;
+    generationStatus: string;
+    mode: string;
+    fly: string;
+    walk: string;
+    fogOn: string;
+    fogOff: string;
+    block: string;
+    biome: string;
+  };
+
+  // Inventory
+  inventory: {
+    helmet: string;
+    chestplate: string;
+    leggings: string;
+    boots: string;
+    cape: string;
+    artifact1: string;
+    artifact2: string;
+    artifact3: string;
+    vanity1: string;
+    vanity2: string;
+    vanity3: string;
+    vanity4: string;
+    stoneBlock: string;
+    woodBlock: string;
+    bronzeOre: string;
+    grassBlock: string;
+    dirtBlock: string;
+    sandBlock: string;
+    leavesBlock: string;
+    snowBlock: string;
+    iceBlock: string;
+    lavaBlock: string;
+    playersOnline: string;
   };
 }
 
@@ -146,7 +196,55 @@ const translations: Record<Language, Translations> = {
     },
     gameUI: {
       helpHint: 'Нажмите ` для отладки',
-      debug: 'Отладка'
+      debug: 'Отладка',
+      move: 'WASD - Движение',
+      toggleFlyWalk: 'Space (2x) - Переключить Полёт/Ходьбу',
+      jumpWalk: 'Space - Прыжок (Ходьба) / Вверх (Полёт)',
+      downFly: 'Shift - Вниз (Полёт)',
+      breakBlock: 'ЛКМ - Разрушить блок',
+      placeBlock: 'ПКМ - Поставить блок',
+      pickupItems: 'E - Подобрать предметы',
+      selectBlock: '1-9,0 - Выбрать блок',
+      inventory: 'TAB - Инвентарь',
+      toggleRenderingMode: 'F2 - Переключить режим рендеринга',
+      toggleDebug: '~ - Переключить отладку',
+      toggleFogBarrier: 'F - Переключить туман',
+      closeMenu: 'ESC - Меню',
+      time: 'ВРЕМЯ',
+      generationCode: 'Код генерации',
+      generationStatus: 'Статус генерации',
+      mode: 'Режим',
+      fly: 'ПОЛЁТ',
+      walk: 'ХОДЬБА',
+      fogOn: 'ВКЛ',
+      fogOff: 'ВЫКЛ',
+      block: 'Блок',
+      biome: 'Биом'
+    },
+    inventory: {
+      helmet: 'Шлем',
+      chestplate: 'Нагрудник',
+      leggings: 'Поножи',
+      boots: 'Ботинки',
+      cape: 'Плащ',
+      artifact1: 'Артефакт 1',
+      artifact2: 'Артефакт 2',
+      artifact3: 'Артефакт 3',
+      vanity1: 'Костюм 1',
+      vanity2: 'Костюм 2',
+      vanity3: 'Костюм 3',
+      vanity4: 'Костюм 4',
+      stoneBlock: 'Каменный блок',
+      woodBlock: 'Деревянный блок',
+      bronzeOre: 'Бронзовая руда',
+      grassBlock: 'Блок травы',
+      dirtBlock: 'Блок земли',
+      sandBlock: 'Блок песка',
+      leavesBlock: 'Блок листьев',
+      snowBlock: 'Блок снега',
+      iceBlock: 'Блок льда',
+      lavaBlock: 'Блок лавы',
+      playersOnline: 'Игроки онлайн'
     }
   },
   en: {
@@ -215,7 +313,55 @@ const translations: Record<Language, Translations> = {
     },
     gameUI: {
       helpHint: 'Press ` for debug',
-      debug: 'Debug'
+      debug: 'Debug',
+      move: 'WASD - Move',
+      toggleFlyWalk: 'Space (2x) - Toggle Fly/Walk',
+      jumpWalk: 'Space - Jump (Walk) / Up (Fly)',
+      downFly: 'Shift - Down (Fly)',
+      breakBlock: 'Left Click - Break Block',
+      placeBlock: 'Right Click - Place Block',
+      pickupItems: 'E - Pickup Items',
+      selectBlock: '1-9,0 - Select Block',
+      inventory: 'TAB - Inventory',
+      toggleRenderingMode: 'F2 - Toggle Rendering Mode',
+      toggleDebug: '~ - Toggle Debug',
+      toggleFogBarrier: 'F - Toggle Fog Barrier',
+      closeMenu: 'ESC - Menu',
+      time: 'TIME',
+      generationCode: 'Generation code',
+      generationStatus: 'Generation status',
+      mode: 'Mode',
+      fly: 'FLY',
+      walk: 'WALK',
+      fogOn: 'ON',
+      fogOff: 'OFF',
+      block: 'Block',
+      biome: 'Biome'
+    },
+    inventory: {
+      helmet: 'Helmet',
+      chestplate: 'Chestplate',
+      leggings: 'Leggings',
+      boots: 'Boots',
+      cape: 'Cape',
+      artifact1: 'Artifact 1',
+      artifact2: 'Artifact 2',
+      artifact3: 'Artifact 3',
+      vanity1: 'Vanity 1',
+      vanity2: 'Vanity 2',
+      vanity3: 'Vanity 3',
+      vanity4: 'Vanity 4',
+      stoneBlock: 'Stone Block',
+      woodBlock: 'Wood Block',
+      bronzeOre: 'Bronze Ore',
+      grassBlock: 'Grass Block',
+      dirtBlock: 'Dirt Block',
+      sandBlock: 'Sand Block',
+      leavesBlock: 'Leaves Block',
+      snowBlock: 'Snow Block',
+      iceBlock: 'Ice Block',
+      lavaBlock: 'Lava Block',
+      playersOnline: 'Players Online'
     }
   },
   es: {
@@ -284,7 +430,55 @@ const translations: Record<Language, Translations> = {
     },
     gameUI: {
       helpHint: 'Presiona ` para depuración',
-      debug: 'Depuración'
+      debug: 'Depuración',
+      move: 'WASD - Moverse',
+      toggleFlyWalk: 'Espacio (2x) - Alternar Vuelo/Caminar',
+      jumpWalk: 'Espacio - Saltar (Caminar) / Arriba (Vuelo)',
+      downFly: 'Shift - Abajo (Vuelo)',
+      breakBlock: 'Clic Izquierdo - Romper Bloque',
+      placeBlock: 'Clic Derecho - Colocar Bloque',
+      pickupItems: 'E - Recoger Objetos',
+      selectBlock: '1-9,0 - Seleccionar Bloque',
+      inventory: 'TAB - Inventario',
+      toggleRenderingMode: 'F2 - Alternar Modo de Renderizado',
+      toggleDebug: '~ - Alternar Depuración',
+      toggleFogBarrier: 'F - Alternar Barrera de Niebla',
+      closeMenu: 'ESC - Menú',
+      time: 'TIEMPO',
+      generationCode: 'Código de generación',
+      generationStatus: 'Estado de generación',
+      mode: 'Modo',
+      fly: 'VUELO',
+      walk: 'CAMINAR',
+      fogOn: 'ENC',
+      fogOff: 'APAG',
+      block: 'Bloque',
+      biome: 'Bioma'
+    },
+    inventory: {
+      helmet: 'Casco',
+      chestplate: 'Peto',
+      leggings: 'Grebas',
+      boots: 'Botas',
+      cape: 'Capa',
+      artifact1: 'Artefacto 1',
+      artifact2: 'Artefacto 2',
+      artifact3: 'Artefacto 3',
+      vanity1: 'Vanidad 1',
+      vanity2: 'Vanidad 2',
+      vanity3: 'Vanidad 3',
+      vanity4: 'Vanidad 4',
+      stoneBlock: 'Bloque de Piedra',
+      woodBlock: 'Bloque de Madera',
+      bronzeOre: 'Mineral de Bronce',
+      grassBlock: 'Bloque de Hierba',
+      dirtBlock: 'Bloque de Tierra',
+      sandBlock: 'Bloque de Arena',
+      leavesBlock: 'Bloque de Hojas',
+      snowBlock: 'Bloque de Nieve',
+      iceBlock: 'Bloque de Hielo',
+      lavaBlock: 'Bloque de Lava',
+      playersOnline: 'Jugadores en Línea'
     }
   },
   de: {
@@ -353,7 +547,55 @@ const translations: Record<Language, Translations> = {
     },
     gameUI: {
       helpHint: 'Drücke ` für Debug',
-      debug: 'Debug'
+      debug: 'Debug',
+      move: 'WASD - Bewegen',
+      toggleFlyWalk: 'Leertaste (2x) - Flug/Laufen umschalten',
+      jumpWalk: 'Leertaste - Springen (Laufen) / Hoch (Flug)',
+      downFly: 'Shift - Runter (Flug)',
+      breakBlock: 'Linksklick - Block zerbrechen',
+      placeBlock: 'Rechtsklick - Block platzieren',
+      pickupItems: 'E - Gegenstände aufheben',
+      selectBlock: '1-9,0 - Block auswählen',
+      inventory: 'TAB - Inventar',
+      toggleRenderingMode: 'F2 - Rendering-Modus umschalten',
+      toggleDebug: '~ - Debug umschalten',
+      toggleFogBarrier: 'F - Nebelbarriere umschalten',
+      closeMenu: 'ESC - Menü',
+      time: 'ZEIT',
+      generationCode: 'Generierungscode',
+      generationStatus: 'Generierungsstatus',
+      mode: 'Modus',
+      fly: 'FLUG',
+      walk: 'LAUFEN',
+      fogOn: 'AN',
+      fogOff: 'AUS',
+      block: 'Block',
+      biome: 'Biom'
+    },
+    inventory: {
+      helmet: 'Helm',
+      chestplate: 'Brustplatte',
+      leggings: 'Beinschutz',
+      boots: 'Stiefel',
+      cape: 'Umhang',
+      artifact1: 'Artefakt 1',
+      artifact2: 'Artefakt 2',
+      artifact3: 'Artefakt 3',
+      vanity1: 'Eitelkeit 1',
+      vanity2: 'Eitelkeit 2',
+      vanity3: 'Eitelkeit 3',
+      vanity4: 'Eitelkeit 4',
+      stoneBlock: 'Steinblock',
+      woodBlock: 'Holzblock',
+      bronzeOre: 'Bronze Erz',
+      grassBlock: 'Grasblock',
+      dirtBlock: 'Erdblock',
+      sandBlock: 'Sandblock',
+      leavesBlock: 'Blätterblock',
+      snowBlock: 'Schneeblock',
+      iceBlock: 'Eisblock',
+      lavaBlock: 'Lavablock',
+      playersOnline: 'Spieler Online'
     }
   },
   zh: {
@@ -422,7 +664,55 @@ const translations: Record<Language, Translations> = {
     },
     gameUI: {
       helpHint: '按 ` 进行调试',
-      debug: '调试'
+      debug: '调试',
+      move: 'WASD - 移动',
+      toggleFlyWalk: '空格键 (2x) - 切换飞行/步行',
+      jumpWalk: '空格键 - 跳跃 (步行) / 上升 (飞行)',
+      downFly: 'Shift - 下降 (飞行)',
+      breakBlock: '左键 - 破坏方块',
+      placeBlock: '右键 - 放置方块',
+      pickupItems: 'E - 拾取物品',
+      selectBlock: '1-9,0 - 选择方块',
+      inventory: 'TAB - 物品栏',
+      toggleRenderingMode: 'F2 - 切换渲染模式',
+      toggleDebug: '~ - 切换调试',
+      toggleFogBarrier: 'F - 切换雾障',
+      closeMenu: 'ESC - 菜单',
+      time: '时间',
+      generationCode: '生成代码',
+      generationStatus: '生成状态',
+      mode: '模式',
+      fly: '飞行',
+      walk: '步行',
+      fogOn: '开',
+      fogOff: '关',
+      block: '方块',
+      biome: '生物群系'
+    },
+    inventory: {
+      helmet: '头盔',
+      chestplate: '胸甲',
+      leggings: '护腿',
+      boots: '靴子',
+      cape: '披风',
+      artifact1: '神器 1',
+      artifact2: '神器 2',
+      artifact3: '神器 3',
+      vanity1: '虚荣 1',
+      vanity2: '虚荣 2',
+      vanity3: '虚荣 3',
+      vanity4: '虚荣 4',
+      stoneBlock: '石块',
+      woodBlock: '木块',
+      bronzeOre: '青铜矿石',
+      grassBlock: '草块',
+      dirtBlock: '泥土块',
+      sandBlock: '沙块',
+      leavesBlock: '树叶块',
+      snowBlock: '雪块',
+      iceBlock: '冰块',
+      lavaBlock: '熔岩块',
+      playersOnline: '在线玩家'
     }
   },
   ko: {
@@ -491,7 +781,55 @@ const translations: Record<Language, Translations> = {
     },
     gameUI: {
       helpHint: '` 키를 눌러 디버그',
-      debug: '디버그'
+      debug: '디버그',
+      move: 'WASD - 이동',
+      toggleFlyWalk: '스페이스바 (2x) - 비행/걷기 전환',
+      jumpWalk: '스페이스바 - 점프 (걷기) / 위쪽 (비행)',
+      downFly: 'Shift - 아래쪽 (비행)',
+      breakBlock: '왼쪽 클릭 - 블록 파괴',
+      placeBlock: '오른쪽 클릭 - 블록 배치',
+      pickupItems: 'E - 아이템 줍기',
+      selectBlock: '1-9,0 - 블록 선택',
+      inventory: 'TAB - 인벤토리',
+      toggleRenderingMode: 'F2 - 렌더링 모드 전환',
+      toggleDebug: '~ - 디버그 전환',
+      toggleFogBarrier: 'F - 안개 장벽 전환',
+      closeMenu: 'ESC - 메뉴',
+      time: '시간',
+      generationCode: '생성 코드',
+      generationStatus: '생성 상태',
+      mode: '모드',
+      fly: '비행',
+      walk: '걷기',
+      fogOn: '켜짐',
+      fogOff: '꺼짐',
+      block: '블록',
+      biome: '바이옴'
+    },
+    inventory: {
+      helmet: '투구',
+      chestplate: '흉갑',
+      leggings: '각반',
+      boots: '부츠',
+      cape: '망토',
+      artifact1: '유물 1',
+      artifact2: '유물 2',
+      artifact3: '유물 3',
+      vanity1: '허영 1',
+      vanity2: '허영 2',
+      vanity3: '허영 3',
+      vanity4: '허영 4',
+      stoneBlock: '돌 블록',
+      woodBlock: '나무 블록',
+      bronzeOre: '청동 광석',
+      grassBlock: '풀 블록',
+      dirtBlock: '흙 블록',
+      sandBlock: '모래 블록',
+      leavesBlock: '잎 블록',
+      snowBlock: '눈 블록',
+      iceBlock: '얼음 블록',
+      lavaBlock: '용암 블록',
+      playersOnline: '온라인 플레이어'
     }
   },
   ja: {
@@ -560,7 +898,55 @@ const translations: Record<Language, Translations> = {
     },
     gameUI: {
       helpHint: '` キーでデバッグ',
-      debug: 'デバッグ'
+      debug: 'デバッグ',
+      move: 'WASD - 移動',
+      toggleFlyWalk: 'スペース (2x) - 飛行/歩行切り替え',
+      jumpWalk: 'スペース - ジャンプ (歩行) / 上昇 (飛行)',
+      downFly: 'Shift - 下降 (飛行)',
+      breakBlock: '左クリック - ブロック破壊',
+      placeBlock: '右クリック - ブロック設置',
+      pickupItems: 'E - アイテム拾得',
+      selectBlock: '1-9,0 - ブロック選択',
+      inventory: 'TAB - インベントリ',
+      toggleRenderingMode: 'F2 - レンダリングモード切り替え',
+      toggleDebug: '~ - デバッグ切り替え',
+      toggleFogBarrier: 'F - 霧バリア切り替え',
+      closeMenu: 'ESC - メニュー',
+      time: '時間',
+      generationCode: '生成コード',
+      generationStatus: '生成ステータス',
+      mode: 'モード',
+      fly: '飛行',
+      walk: '歩行',
+      fogOn: 'オン',
+      fogOff: 'オフ',
+      block: 'ブロック',
+      biome: 'バイオーム'
+    },
+    inventory: {
+      helmet: 'ヘルメット',
+      chestplate: 'チェストプレート',
+      leggings: 'レギンス',
+      boots: 'ブーツ',
+      cape: 'ケープ',
+      artifact1: 'アーティファクト 1',
+      artifact2: 'アーティファクト 2',
+      artifact3: 'アーティファクト 3',
+      vanity1: 'バニティ 1',
+      vanity2: 'バニティ 2',
+      vanity3: 'バニティ 3',
+      vanity4: 'バニティ 4',
+      stoneBlock: '石ブロック',
+      woodBlock: '木ブロック',
+      bronzeOre: '銅鉱石',
+      grassBlock: '草ブロック',
+      dirtBlock: '土ブロック',
+      sandBlock: '砂ブロック',
+      leavesBlock: '葉ブロック',
+      snowBlock: '雪ブロック',
+      iceBlock: '氷ブロック',
+      lavaBlock: '溶岩ブロック',
+      playersOnline: 'オンラインプレイヤー'
     }
   }
 };

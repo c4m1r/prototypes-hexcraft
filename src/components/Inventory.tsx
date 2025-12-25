@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Item, InventorySlot, EquipmentSlot as EquipmentSlotType, Player } from '../types/game';
+import { useLanguage } from '../contexts/LanguageContext';
 
 interface InventoryProps {
   isOpen: boolean;
@@ -23,18 +24,13 @@ const Inventory: React.FC<InventoryProps> = ({
   onEquipmentChange,
   onItemPickup
 }) => {
+  const { t } = useLanguage();
   const [draggedItem, setDraggedItem] = useState<{ item: Item; count: number; fromSlot: number; fromType: 'inventory' | 'hotbar' } | null>(null);
   const [dragOverSlot, setDragOverSlot] = useState<number | null>(null);
   const [tooltip, setTooltip] = useState<{ item: Item; x: number; y: number } | null>(null);
-  // Динамический список игроков (в будущем можно подключить к реальному серверу)
+  // Только текущий игрок (в будущем можно добавить реальных игроков)
   const [players] = useState<Player[]>([
-    { id: '1', name: playerState?.name || 'Player', position: { x: 0, y: 0, z: 0 }, isOnline: true },
-    // Моковые игроки для демонстрации
-    { id: '2', name: 'Steve', position: { x: 10, y: 0, z: 5 }, isOnline: true },
-    { id: '3', name: 'Alex', position: { x: -5, y: 0, z: 10 }, isOnline: false },
-    { id: '4', name: 'Notch', position: { x: 15, y: 0, z: -8 }, isOnline: true },
-    { id: '5', name: 'Jeb', position: { x: -12, y: 0, z: 3 }, isOnline: false },
-    { id: '6', name: 'Dinnerbone', position: { x: 8, y: 0, z: 12 }, isOnline: true },
+    { id: '1', name: playerState?.name || 'Player', position: { x: 0, y: 0, z: 0 }, isOnline: true }
   ]);
 
   // Инициализация инвентаря если не существует
@@ -42,9 +38,9 @@ const Inventory: React.FC<InventoryProps> = ({
     if (!playerState.inventory || playerState.inventory.length !== INVENTORY_SIZE) {
       const emptyInventory = Array(INVENTORY_SIZE).fill(null).map(() => ({ item: null, count: 0 }));
       // Добавим несколько тестовых предметов
-      emptyInventory[0] = { item: { id: 'stone', name: 'Stone Block', type: 'block', stackSize: 64, maxStackSize: 64, rarity: 'common', color: '#7a7a7a' }, count: 64 };
-      emptyInventory[1] = { item: { id: 'wood', name: 'Wood Block', type: 'block', stackSize: 32, maxStackSize: 64, rarity: 'common', color: '#6b4423' }, count: 32 };
-      emptyInventory[2] = { item: { id: 'bronze', name: 'Bronze Ore', type: 'material', stackSize: 16, maxStackSize: 64, rarity: 'uncommon', color: '#cd7f32' }, count: 16 };
+      emptyInventory[0] = { item: { id: 'stone', name: t.inventory.stoneBlock, type: 'block', stackSize: 64, maxStackSize: 64, rarity: 'common', color: '#7a7a7a' }, count: 64 };
+      emptyInventory[1] = { item: { id: 'wood', name: t.inventory.woodBlock, type: 'block', stackSize: 32, maxStackSize: 64, rarity: 'common', color: '#6b4423' }, count: 32 };
+      emptyInventory[2] = { item: { id: 'bronze', name: t.inventory.bronzeOre, type: 'material', stackSize: 16, maxStackSize: 64, rarity: 'uncommon', color: '#cd7f32' }, count: 16 };
       onInventoryChange(emptyInventory);
     }
 
@@ -52,15 +48,15 @@ const Inventory: React.FC<InventoryProps> = ({
       const emptyHotbar = Array(HOTBAR_SIZE).fill(null).map(() => ({ item: null, count: 0 }));
       // Хоткеи с бесконечными предметами
       const infiniteItems = [
-        { id: 'grass', name: 'Grass Block', type: 'block', stackSize: 1, maxStackSize: 1, rarity: 'common', color: '#4a7c3a', infinite: true },
-        { id: 'dirt', name: 'Dirt Block', type: 'block', stackSize: 1, maxStackSize: 1, rarity: 'common', color: '#8b5a3c', infinite: true },
-        { id: 'stone', name: 'Stone Block', type: 'block', stackSize: 1, maxStackSize: 1, rarity: 'common', color: '#7a7a7a', infinite: true },
-        { id: 'sand', name: 'Sand Block', type: 'block', stackSize: 1, maxStackSize: 1, rarity: 'common', color: '#ddc689', infinite: true },
-        { id: 'wood', name: 'Wood Block', type: 'block', stackSize: 1, maxStackSize: 1, rarity: 'common', color: '#6b4423', infinite: true },
-        { id: 'leaves', name: 'Leaves Block', type: 'block', stackSize: 1, maxStackSize: 1, rarity: 'common', color: '#2d5016', infinite: true },
-        { id: 'snow', name: 'Snow Block', type: 'block', stackSize: 1, maxStackSize: 1, rarity: 'common', color: '#e8f2f7', infinite: true },
-        { id: 'ice', name: 'Ice Block', type: 'block', stackSize: 1, maxStackSize: 1, rarity: 'common', color: '#b8d8e8', infinite: true },
-        { id: 'lava', name: 'Lava Block', type: 'block', stackSize: 1, maxStackSize: 1, rarity: 'common', color: '#ff4500', infinite: true },
+        { id: 'grass', name: t.inventory.grassBlock, type: 'block', stackSize: 1, maxStackSize: 1, rarity: 'common', color: '#4a7c3a', infinite: true },
+        { id: 'dirt', name: t.inventory.dirtBlock, type: 'block', stackSize: 1, maxStackSize: 1, rarity: 'common', color: '#8b5a3c', infinite: true },
+        { id: 'stone', name: t.inventory.stoneBlock, type: 'block', stackSize: 1, maxStackSize: 1, rarity: 'common', color: '#7a7a7a', infinite: true },
+        { id: 'sand', name: t.inventory.sandBlock, type: 'block', stackSize: 1, maxStackSize: 1, rarity: 'common', color: '#ddc689', infinite: true },
+        { id: 'wood', name: t.inventory.woodBlock, type: 'block', stackSize: 1, maxStackSize: 1, rarity: 'common', color: '#6b4423', infinite: true },
+        { id: 'leaves', name: t.inventory.leavesBlock, type: 'block', stackSize: 1, maxStackSize: 1, rarity: 'common', color: '#2d5016', infinite: true },
+        { id: 'snow', name: t.inventory.snowBlock, type: 'block', stackSize: 1, maxStackSize: 1, rarity: 'common', color: '#e8f2f7', infinite: true },
+        { id: 'ice', name: t.inventory.iceBlock, type: 'block', stackSize: 1, maxStackSize: 1, rarity: 'common', color: '#b8d8e8', infinite: true },
+        { id: 'lava', name: t.inventory.lavaBlock, type: 'block', stackSize: 1, maxStackSize: 1, rarity: 'common', color: '#ff4500', infinite: true },
       ];
 
       emptyHotbar.forEach((slot, index) => {
@@ -266,7 +262,7 @@ const Inventory: React.FC<InventoryProps> = ({
         <div className="inventory-content">
           {/* Список игроков */}
           <div className="players-panel">
-            <h3>Players Online</h3>
+            <h3>{t.inventory.playersOnline}</h3>
             <div className="players-list">
               {players.map(player => (
                 <div key={player.id} className={`player-item ${player.isOnline ? 'online' : 'offline'}`}>
@@ -286,58 +282,7 @@ const Inventory: React.FC<InventoryProps> = ({
 
           {/* Персонаж и экипировка */}
           <div className="character-equipment-panel">
-            {/* Экипировка - левая сторона */}
-            <div className="equipment-panel">
-              {/* Шлем и артефакты */}
-              <div className="equipment-row">
-                <EquipmentSlot
-                  slot={playerState.equipment?.[0] || { type: 'helmet', item: null, name: 'Helmet' }}
-                  onClick={() => {}}
-                />
-                <EquipmentSlot
-                  slot={playerState.equipment?.[5] || { type: 'artifact1', item: null, name: 'Artifact 1' }}
-                  onClick={() => {}}
-                />
-              </div>
-
-              {/* Нагрудник и плащ */}
-              <div className="equipment-row">
-                <EquipmentSlot
-                  slot={playerState.equipment?.[1] || { type: 'chestplate', item: null, name: 'Chestplate' }}
-                  onClick={() => {}}
-                />
-                <EquipmentSlot
-                  slot={playerState.equipment?.[4] || { type: 'cape', item: null, name: 'Cape' }}
-                  onClick={() => {}}
-                />
-              </div>
-
-              {/* Поножи и артефакт */}
-              <div className="equipment-row">
-                <EquipmentSlot
-                  slot={playerState.equipment?.[2] || { type: 'leggings', item: null, name: 'Leggings' }}
-                  onClick={() => {}}
-                />
-                <EquipmentSlot
-                  slot={playerState.equipment?.[6] || { type: 'artifact2', item: null, name: 'Artifact 2' }}
-                  onClick={() => {}}
-                />
-              </div>
-
-              {/* Ботинки и артефакт */}
-              <div className="equipment-row">
-                <EquipmentSlot
-                  slot={playerState.equipment?.[3] || { type: 'boots', item: null, name: 'Boots' }}
-                  onClick={() => {}}
-                />
-                <EquipmentSlot
-                  slot={playerState.equipment?.[7] || { type: 'artifact3', item: null, name: 'Artifact 3' }}
-                  onClick={() => {}}
-                />
-              </div>
-            </div>
-
-            {/* Персонаж - центр */}
+            {/* Персонаж - левая сторона */}
             <div className="character-panel">
               <div className="character-preview">
                 <div className="character-body">
@@ -347,6 +292,81 @@ const Inventory: React.FC<InventoryProps> = ({
                 </div>
               </div>
               <div className="character-name">{playerState?.name || 'Player'}</div>
+            </div>
+
+            {/* Экипировка - правая сторона */}
+            <div className="equipment-panel">
+              {/* Шлем и артефакты */}
+              <div className="equipment-row">
+                <EquipmentSlot
+                  slot={playerState.equipment?.[0] || { type: 'helmet', item: null, name: t.inventory.helmet }}
+                  onClick={() => {}}
+                />
+                <EquipmentSlot
+                  slot={playerState.equipment?.[5] || { type: 'artifact1', item: null, name: t.inventory.artifact1 }}
+                  onClick={() => {}}
+                />
+              </div>
+
+              {/* Нагрудник и vanity (костюм поверх брони) */}
+              <div className="equipment-row">
+                <EquipmentSlot
+                  slot={playerState.equipment?.[1] || { type: 'chestplate', item: null, name: t.inventory.chestplate }}
+                  onClick={() => {}}
+                />
+                <EquipmentSlot
+                  slot={playerState.equipment?.[8] || { type: 'vanity1', item: null, name: t.inventory.vanity1 }}
+                  onClick={() => {}}
+                />
+              </div>
+
+              {/* Поножи и vanity */}
+              <div className="equipment-row">
+                <EquipmentSlot
+                  slot={playerState.equipment?.[2] || { type: 'leggings', item: null, name: t.inventory.leggings }}
+                  onClick={() => {}}
+                />
+                <EquipmentSlot
+                  slot={playerState.equipment?.[9] || { type: 'vanity2', item: null, name: t.inventory.vanity2 }}
+                  onClick={() => {}}
+                />
+              </div>
+
+              {/* Ботинки и vanity */}
+              <div className="equipment-row">
+                <EquipmentSlot
+                  slot={playerState.equipment?.[3] || { type: 'boots', item: null, name: t.inventory.boots }}
+                  onClick={() => {}}
+                />
+                <EquipmentSlot
+                  slot={playerState.equipment?.[10] || { type: 'vanity3', item: null, name: t.inventory.vanity3 }}
+                  onClick={() => {}}
+                />
+              </div>
+
+              {/* Плащ и vanity */}
+              <div className="equipment-row">
+                <EquipmentSlot
+                  slot={playerState.equipment?.[4] || { type: 'cape', item: null, name: t.inventory.cape }}
+                  onClick={() => {}}
+                />
+                <EquipmentSlot
+                  slot={playerState.equipment?.[11] || { type: 'vanity4', item: null, name: t.inventory.vanity4 }}
+                  onClick={() => {}}
+                />
+              </div>
+
+              {/* Артефакты по центру */}
+              <div className="equipment-row artifacts-row">
+                <EquipmentSlot
+                  slot={playerState.equipment?.[6] || { type: 'artifact2', item: null, name: t.inventory.artifact2 }}
+                  onClick={() => {}}
+                />
+                <EquipmentSlot
+                  slot={playerState.equipment?.[7] || { type: 'artifact3', item: null, name: t.inventory.artifact3 }}
+                  onClick={() => {}}
+                />
+              </div>
             </div>
           </div>
 

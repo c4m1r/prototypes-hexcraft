@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import Inventory from './Inventory';
 import { InventorySlot, EquipmentSlot } from '../types/game';
+import { useLanguage } from '../contexts/LanguageContext';
 import './Inventory.css';
 
 interface GameUIProps {
@@ -8,6 +9,7 @@ interface GameUIProps {
   playerPosition: { x: number; y: number; z: number };
   isFlying: boolean;
   targetBlock: string | null;
+  targetBiome: string | null;
   showFogBarrier: boolean;
   currentTime: string;
   showHelpHint?: boolean;
@@ -29,6 +31,7 @@ export function GameUI({
   playerPosition,
   isFlying,
   targetBlock,
+  targetBiome,
   showFogBarrier,
   currentTime,
   showHelpHint = false,
@@ -44,6 +47,7 @@ export function GameUI({
   onHotbarChange,
   onEquipmentChange
 }: GameUIProps) {
+  const { t } = useLanguage();
   const [helpVisible, setHelpVisible] = useState(showHelpHint);
 
   useEffect(() => {
@@ -123,7 +127,34 @@ export function GameUI({
         </div>
       </div>
 
-      <div id="hotbar" className="fixed bottom-8 left-1/2 -translate-x-1/2 pointer-events-none"></div>
+      {/* Хотбар */}
+      <div className="fixed bottom-8 left-1/2 -translate-x-1/2 flex gap-1 bg-black/50 rounded-lg p-2 pointer-events-none">
+        {playerState?.hotbar?.map((slot, index) => (
+          <div
+            key={index}
+            className={`w-12 h-12 border-2 rounded flex items-center justify-center text-white text-sm font-bold ${
+              index === 0 ? 'border-yellow-400 bg-yellow-400/20' : 'border-white/30'
+            }`}
+          >
+            {slot.item && (
+              <div
+                className="w-8 h-8 rounded"
+                style={{ backgroundColor: slot.item.color || '#666' }}
+              />
+            )}
+            {slot.count > 1 && (
+              <div className="absolute bottom-0 right-0 bg-black/80 text-white text-xs px-1 rounded">
+                {slot.count}
+              </div>
+            )}
+            {slot.item?.infinite && (
+              <div className="absolute top-0 right-0 text-yellow-400 text-sm font-bold">
+                ∞
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
 
       {/* Инвентарь */}
       <Inventory
@@ -138,14 +169,14 @@ export function GameUI({
       {showDebug ? (
         <div className="fixed left-8 top-8 bg-black/70 text-white px-4 py-3 rounded-lg text-xs space-y-2 pointer-events-none border border-white/30 font-mono">
           <div className="font-bold text-white border-b border-white/30 pb-2">
-            TIME: {currentTime}
+            {t.gameUI.time}: {currentTime}
           </div>
 
           <div className="pt-1 text-green-300 font-semibold">
-            Generation code: {generationCode}
+            {t.gameUI.generationCode}: {generationCode}
           </div>
           <div className="text-xs text-gray-200 pb-2">
-            Generation status: {generationStatus}
+            {t.gameUI.generationStatus}: {generationStatus}
           </div>
 
           <div>X: {playerPosition.x.toFixed(2)}</div>
@@ -153,38 +184,44 @@ export function GameUI({
           <div>Z: {playerPosition.z.toFixed(2)}</div>
 
           <div className="pt-2 border-t border-white/30">
-            Mode: {isFlying ? 'FLY' : 'WALK'}
+            {t.gameUI.mode}: {isFlying ? t.gameUI.fly : t.gameUI.walk}
           </div>
 
           {targetBlock && (
             <div className="pt-2 border-t border-white/30 font-medium text-green-400">
-              Block: {targetBlock}
+              {t.gameUI.block}: {targetBlock}
+            </div>
+          )}
+
+          {targetBiome && (
+            <div className="pt-1 border-t border-white/30 text-sm text-blue-400">
+              {t.gameUI.biome}: {targetBiome}
             </div>
           )}
 
           <div className="pt-2 border-t border-white/30 text-xs text-gray-300">
-            F: Fog {showFogBarrier ? 'ON' : 'OFF'}
+            F: Fog {showFogBarrier ? t.gameUI.fogOn : t.gameUI.fogOff}
           </div>
 
           <div className="pt-2 border-t border-white/30 text-xs">
-            ~ - Close | ESC - Menu
+            ~ - {t.gameUI.toggleDebug} | ESC - {t.gameUI.closeMenu}
           </div>
         </div>
       ) : (
         <div className="fixed top-8 left-8 bg-black/70 text-white px-4 py-2 rounded-lg text-sm space-y-1 pointer-events-none border border-white/30">
-          <div>WASD - Move</div>
-          <div>Space (2x) - Toggle Fly/Walk</div>
-          <div>Space - Jump (Walk) / Up (Fly)</div>
-          <div>Shift - Down (Fly)</div>
-          <div>Left Click - Break Block</div>
-          <div>Right Click - Place Block</div>
-          <div>E - Pickup Items</div>
-          <div>1-9,0 - Select Block</div>
-          <div>TAB - Inventory</div>
-          <div>F2 - Toggle Rendering Mode</div>
-          <div>~ - Toggle Debug</div>
-          <div>F - Toggle Fog Barrier</div>
-          <div>ESC - Menu</div>
+          <div>{t.gameUI.move}</div>
+          <div>{t.gameUI.toggleFlyWalk}</div>
+          <div>{t.gameUI.jumpWalk}</div>
+          <div>{t.gameUI.downFly}</div>
+          <div>{t.gameUI.breakBlock}</div>
+          <div>{t.gameUI.placeBlock}</div>
+          <div>{t.gameUI.pickupItems}</div>
+          <div>{t.gameUI.selectBlock}</div>
+          <div>{t.gameUI.inventory}</div>
+          <div>{t.gameUI.toggleRenderingMode}</div>
+          <div>{t.gameUI.toggleDebug}</div>
+          <div>{t.gameUI.toggleFogBarrier}</div>
+          <div>{t.gameUI.closeMenu}</div>
         </div>
       )}
     </>

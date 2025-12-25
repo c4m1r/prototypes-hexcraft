@@ -5,12 +5,13 @@ import { RaycastManager } from './RaycastManager';
 import { DayNightCycle } from './DayNightCycle';
 import { GameSettings } from '../types/settings';
 import { InventorySlot, DroppedItem, ITEMS, EquipmentSlot } from '../types/game';
-import { hexToWorld } from '../utils/hexUtils';
+import { hexToWorld, HEX_HEIGHT } from '../utils/hexUtils';
 
 export interface GameState {
   playerPosition: { x: number; y: number; z: number };
   isFlying: boolean;
   targetBlock: string | null;
+  targetBiome: string | null;
   showFogBarrier: boolean;
   currentTime: string;
   health: number;
@@ -76,6 +77,10 @@ export class Game {
       { type: 'artifact1', item: null, name: 'Artifact 1' },
       { type: 'artifact2', item: null, name: 'Artifact 2' },
       { type: 'artifact3', item: null, name: 'Artifact 3' },
+      { type: 'vanity1', item: null, name: 'Vanity 1' },
+      { type: 'vanity2', item: null, name: 'Vanity 2' },
+      { type: 'vanity3', item: null, name: 'Vanity 3' },
+      { type: 'vanity4', item: null, name: 'Vanity 4' },
     ];
 
     // Инициализация хотбара с бесконечными предметами
@@ -292,6 +297,7 @@ export class Game {
         },
         isFlying: this.player.isFlying,
         targetBlock: targetedBlock?.name || null,
+        targetBiome: targetedBlock ? this.world.getBiomeAt(this.player.position.x, this.player.position.z) : null,
         showFogBarrier: this.world.getFogBarrierState(),
         currentTime: this.dayNightCycle.getCurrentTime(),
         health: this.health,
@@ -331,14 +337,24 @@ export class Game {
     this.world.setRenderingMode(mode);
   }
 
+  toggleFogBarrier() {
+    this.world.toggleFogBarrier();
+  }
+
   private createDroppedItem(block: Block): void {
+    console.log('Creating dropped item for block:', block);
     // Находим позицию центра блока
     const blockPos = hexToWorld(block.position.q, block.position.r, block.position.y);
     const centerY = blockPos.y + HEX_HEIGHT / 2; // Центр блока по высоте
+    console.log('Block position:', blockPos, 'center Y:', centerY, 'HEX_HEIGHT:', HEX_HEIGHT);
 
     // Создаем dropped item
     const item = ITEMS.find(item => item.id === block.type);
-    if (!item) return;
+    if (!item) {
+      console.log('Item not found for block type:', block.type);
+      return;
+    }
+    console.log('Found item:', item.name);
 
     const droppedItem: DroppedItem = {
       id: `item_${this.nextItemId++}`,
@@ -358,6 +374,7 @@ export class Game {
     };
 
     this.droppedItems.push(droppedItem);
+    console.log('Dropped item created:', droppedItem);
 
     // Создаем визуализацию
     this.createDroppedItemMesh(droppedItem);
@@ -365,7 +382,9 @@ export class Game {
 
   private createDroppedItemMesh(item: DroppedItem): void {
     console.log('Creating mesh for item:', item.item.name, 'at position:', item.position);
-    const geometry = new THREE.BoxGeometry(0.3, 0.3, 0.3);
+    // Размер в 3 раза меньше оригинального блока (HEX_HEIGHT / 3)
+    const blockSize = HEX_HEIGHT / 3;
+    const geometry = new THREE.BoxGeometry(blockSize, blockSize, blockSize);
     const material = new THREE.MeshLambertMaterial({
       color: item.item.color || 0x666666,
       transparent: true,
@@ -373,12 +392,12 @@ export class Game {
     });
 
     const mesh = new THREE.Mesh(geometry, material);
-    mesh.position.set(item.position.x, item.position.y + 0.15, item.position.z);
+    mesh.position.set(item.position.x, item.position.y + blockSize/2, item.position.z);
     mesh.userData = { itemId: item.id };
 
     this.scene.add(mesh);
     this.droppedItemMeshes.set(item.id, mesh);
-    console.log('Mesh created and added to scene');
+    console.log('Mesh created and added to scene, size:', blockSize);
   }
 
   private removeDroppedItemMesh(itemId: string): void {
