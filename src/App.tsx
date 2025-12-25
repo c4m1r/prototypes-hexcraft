@@ -116,19 +116,26 @@ function App() {
     setLoadingProgress(20);
     setLoadingStatus('Генерация первого биома...');
 
-    // Генерируем первый чанк (0, 0)
+    // Генерируем ТОЛЬКО первый чанк (0, 0)
     tempWorld.initialize();
     
     // Ждем, чтобы чанк успел полностью загрузиться и сгенерироваться
+    // КРИТИЧНО: Ждем завершения генерации перед размещением игрока
     let attempts = 0;
     let spawnHeight: number | null = null;
-    while (attempts < 50 && spawnHeight === null) {
-      await new Promise(resolve => setTimeout(resolve, 50));
+    const maxAttempts = 100; // Увеличиваем лимит для надежности
+    while (attempts < maxAttempts && spawnHeight === null) {
+      await new Promise(resolve => setTimeout(resolve, 50)); // Yield к браузеру каждые 50ms
       spawnHeight = tempWorld.getHighestBlockAt(0, 0);
       attempts++;
       
-      setLoadingProgress(20 + Math.min(40, attempts * 2));
-      setLoadingStatus(`Генерация первого биома... (${attempts}/50)`);
+      setLoadingProgress(20 + Math.min(40, Math.floor(attempts * 40 / maxAttempts)));
+      setLoadingStatus(`Генерация первого биома... (${attempts}/${maxAttempts})`);
+    }
+    
+    // Если чанк не загрузился, используем высоту по умолчанию
+    if (spawnHeight === null && attempts >= maxAttempts) {
+      console.warn('[App] Чанк (0,0) не загрузился за отведенное время, используем высоту по умолчанию');
     }
     
     setLoadingProgress(60);

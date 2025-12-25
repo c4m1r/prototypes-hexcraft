@@ -184,7 +184,10 @@ export class ChunkGenerator {
     // Пещеры существуют ТОЛЬКО под поверхностью и над каменным основанием
     // Пещеры УДАЛЯЮТ блоки, они НЕ размещают новые
     // Пещеры должны образовывать большие связанные камеры, а не тонкие туннели
-    this.generateCavesStrict(blocks, offsetQ, offsetR, heightMap, baseStoneDepth, maxY);
+    // Пещеры НЕ генерируются в первом видимом чанке (0,0) для стабильности
+    if (!(chunkQ === 0 && chunkR === 0)) {
+      this.generateCavesStrict(blocks, offsetQ, offsetR, heightMap, baseStoneDepth, maxY);
+    }
 
     // ============================================
     // ШАГ 6 — Жидкости (ПОСЛЕ пещер)
@@ -469,18 +472,23 @@ export class ChunkGenerator {
             const isOnStoneBase = y - 1 === baseStoneDepth;
             
             // Вода может заполнить только если есть твердый блок снизу или на каменном основании
+            // КРИТИЧНО: Жидкости должны иметь твердую опору снизу
             if (hasSolidBelow || isOnStoneBase) {
               // Проверяем ограничена ли (есть блоки вокруг или камень)
+              // Для безопасности жидкости должны быть ограничены хотя бы с одной стороны
               let isBounded = false;
               if (y <= baseStoneDepth + 1) {
-                isBounded = true; // На каменном основании
+                isBounded = true; // На каменном основании - всегда безопасно
       } else {
-                // Проверяем соседей
+                // Проверяем соседей - хотя бы один сосед должен быть твердым блоком
                 for (let dq = -1; dq <= 1; dq++) {
                   for (let dr = -1; dr <= 1; dr++) {
                     if (dq === 0 && dr === 0) continue;
                     const neighborKey = `${worldQ + dq},${worldR + dr},${y}`;
-                    if (blockMap.has(neighborKey)) {
+                    const neighborBlock = blockMap.get(neighborKey);
+                    // Сосед должен быть твердым блоком (не жидкостью, не воздухом)
+                    if (neighborBlock && neighborBlock.type !== 'water' && neighborBlock.type !== 'lava' && 
+                        neighborBlock.type !== 'ice' && neighborBlock.type !== 'leaves') {
                       isBounded = true;
         break;
                     }
@@ -489,6 +497,7 @@ export class ChunkGenerator {
                 }
               }
               
+              // Добавляем воду только если она ограничена (безопасна)
               if (isBounded) {
                 // Определяем тип воды на основе биома
                 let liquidType = 'water';
@@ -676,6 +685,7 @@ export class ChunkGenerator {
 
     const blocksToRemove: Block[] = [];
     const passableBlocks = new Set(['water', 'lava', 'leaves', 'ice']); // Жидкости и листва могут плавать
+    const solidBlocks = new Set(['stone', 'dirt', 'grass', 'sand', 'snow', 'wood']); // Твердые блоки
 
     // Удаляем любой блок, который:
     // - Не имеет твердого блока непосредственно снизу
@@ -687,15 +697,24 @@ export class ChunkGenerator {
       // Блоки на y=0 всегда имеют опору (каменное основание)
       if (y <= 0) return;
       
-      // Жидкости и листва могут плавать
-      if (passableBlocks.has(block.type)) return;
+      // Жидкости и листва могут плавать (но должны быть проверены отдельно)
+      if (passableBlocks.has(block.type)) {
+        // Для жидкостей проверяем что есть твердый блок снизу или они ограничены
+        const blockBelowKey = `${block.position.q},${block.position.r},${y - 1}`;
+        const blockBelow = blockMap.get(blockBelowKey);
+        if (!blockBelow || !solidBlocks.has(blockBelow.type)) {
+          // Жидкость без опоры - удаляем
+          blocksToRemove.push(block);
+        }
+        return;
+      }
       
-      // Проверяем есть ли твердый блок непосредственно снизу
+      // Для твердых блоков проверяем есть ли твердый блок непосредственно снизу
       const blockBelowKey = `${block.position.q},${block.position.r},${y - 1}`;
       const blockBelow = blockMap.get(blockBelowKey);
       
       // Если нет твердого блока снизу, удаляем его
-      if (!blockBelow || passableBlocks.has(blockBelow.type)) {
+      if (!blockBelow || !solidBlocks.has(blockBelow.type)) {
         blocksToRemove.push(block);
       }
     });
@@ -705,6 +724,7 @@ export class ChunkGenerator {
       const index = blocks.indexOf(block);
       if (index !== -1) {
         blocks.splice(index, 1);
+        blockMap.delete(`${block.position.q},${block.position.r},${block.position.y}`);
       }
     });
   }

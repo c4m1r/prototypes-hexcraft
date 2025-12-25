@@ -122,11 +122,9 @@ export class World {
       `[World] init seed=${this.generatorSeed} chunkSize=${this.chunkSize} renderDistance=${this.renderDistance} maxLoaded=${this.maxLoadedChunks}`
     );
     this.initialized = true;
-    for (let q = -1; q <= 1; q++) {
-      for (let r = -1; r <= 1; r++) {
-        this.loadChunk(q, r);
-      }
-    }
+    // При старте генерируем ТОЛЬКО центральный чанк (0,0)
+    // Остальные чанки будут генерироваться в фоне после размещения игрока
+    this.loadChunk(0, 0);
 
     if (this.chunks.size === 0 && this.debugLogsLeft > 0) {
       console.error('[World] После initialize чанки не загружены, size=0');
@@ -169,13 +167,24 @@ export class World {
       }
     }
 
+    // Генерируем чанки вокруг игрока в фоне
+    // Разбиваем на небольшие порции для предотвращения блокировки UI
+    const chunksToLoad: { q: number; r: number }[] = [];
     for (let q = playerChunk.q - this.renderDistance; q <= playerChunk.q + this.renderDistance; q++) {
       for (let r = playerChunk.r - this.renderDistance; r <= playerChunk.r + this.renderDistance; r++) {
         const key = getChunkKey(q, r);
         if (!this.chunks.has(key)) {
-          this.loadChunk(q, r);
+          chunksToLoad.push({ q, r });
         }
       }
+    }
+    
+    // Загружаем чанки по одному для предотвращения блокировки UI
+    // Ограничиваем количество загружаемых чанков за один вызов update
+    const maxChunksPerUpdate = 1; // Загружаем по одному чанку за раз
+    for (let i = 0; i < Math.min(maxChunksPerUpdate, chunksToLoad.length); i++) {
+      const chunk = chunksToLoad[i];
+      this.loadChunk(chunk.q, chunk.r);
     }
 
     this.unloadDistantChunks(playerChunk.q, playerChunk.r);
