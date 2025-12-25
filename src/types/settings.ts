@@ -1,4 +1,7 @@
+import { Language } from '../utils/i18n';
+
 export type RenderingMode = 'prototype' | 'modern';
+export type GameMode = 'Solo' | 'Co-op' | 'Online';
 
 export interface GameSettings {
   renderDistance: number;
@@ -7,6 +10,15 @@ export interface GameSettings {
   chunkSize: number;
   maxLoadedChunks: number;
   renderingMode: RenderingMode;
+  seed: number;
+  language: Language;
+}
+
+export interface WorldSetup {
+  playerName: string;
+  gameMode: GameMode;
+  renderingMode: RenderingMode;
+  seed: number;
 }
 
 export const DEFAULT_SETTINGS: GameSettings = {
@@ -15,7 +27,9 @@ export const DEFAULT_SETTINGS: GameSettings = {
   biomeSize: 1,
   chunkSize: 14,
   maxLoadedChunks: 15,
-  renderingMode: 'prototype'
+  renderingMode: 'prototype',
+  seed: Math.floor(Math.random() * 1_000_000_000),
+  language: 'ru'
 };
 
 export const SETTINGS_CONSTRAINTS = {

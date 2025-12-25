@@ -1,7 +1,10 @@
 import * as THREE from 'three';
 
+// HEX_SIZE определяет расстояние между центрами соседних гексагонов
+// Для flat-top ориентации радиус гексагона = HEX_SIZE / sqrt(3)
 export const HEX_SIZE = 1;
-export const HEX_HEIGHT = 1;
+export const HEX_HEIGHT = 2; // Увеличена высота блоков в 2 раза
+export const HEX_RADIUS = HEX_SIZE / Math.sqrt(3); // Радиус гексагона для правильного выравнивания
 
 export interface HexCoords {
   q: number;
@@ -10,14 +13,18 @@ export interface HexCoords {
 }
 
 export function hexToWorld(q: number, r: number, y: number = 0): THREE.Vector3 {
-  const x = HEX_SIZE * (Math.sqrt(3) * q + Math.sqrt(3) / 2 * r);
-  const z = HEX_SIZE * (3 / 2 * r);
+  // Для flat-top ориентации: расстояние между центрами = sqrt(3) * радиус
+  // Если радиус = HEX_RADIUS, то расстояние = sqrt(3) * HEX_RADIUS = HEX_SIZE
+  // Формула должна использовать HEX_RADIUS для правильного масштабирования
+  const x = HEX_RADIUS * Math.sqrt(3) * (q + r / 2);
+  const z = HEX_RADIUS * (3 / 2) * r;
   return new THREE.Vector3(x, y * HEX_HEIGHT, z);
 }
 
 export function worldToHex(x: number, z: number): HexCoords {
-  const q = (Math.sqrt(3) / 3 * x - 1 / 3 * z) / HEX_SIZE;
-  const r = (2 / 3 * z) / HEX_SIZE;
+  // Обратная формула для flat-top ориентации
+  const q = (Math.sqrt(3) / 3 * x - 1 / 3 * z) / HEX_RADIUS;
+  const r = (2 / 3 * z) / HEX_RADIUS;
   return axialRound(q, r);
 }
 
@@ -43,7 +50,10 @@ export function axialRound(q: number, r: number): HexCoords {
 }
 
 export function createHexGeometry(): THREE.CylinderGeometry {
-  return new THREE.CylinderGeometry(HEX_SIZE, HEX_SIZE, HEX_HEIGHT, 6);
+  const geometry = new THREE.CylinderGeometry(HEX_RADIUS, HEX_RADIUS, HEX_HEIGHT, 6);
+  // Поворачиваем геометрию на 30 градусов для правильной ориентации flat-top гексагонов
+  geometry.rotateY(Math.PI / 6);
+  return geometry;
 }
 
 export function createHexGeometryWithUV(): THREE.BufferGeometry {
@@ -53,9 +63,11 @@ export function createHexGeometryWithUV(): THREE.BufferGeometry {
   const uvs: number[] = [];
   const indices: number[] = [];
 
-  const radius = HEX_SIZE;
+  const radius = HEX_RADIUS; // Используем правильный радиус для выравнивания
   const height = HEX_HEIGHT;
   const segments = 6;
+  // Поворот на 30 градусов для правильной ориентации flat-top гексагонов
+  const rotationOffset = Math.PI / 6;
 
   // Верхняя грань (верхняя текстура)
   const topCenterIndex = vertices.length / 3;
@@ -64,14 +76,15 @@ export function createHexGeometryWithUV(): THREE.BufferGeometry {
   uvs.push(0.5, 0.5); // Центр верхней текстуры
 
   for (let i = 0; i <= segments; i++) {
-    const angle = (i / segments) * Math.PI * 2;
+    const angle = (i / segments) * Math.PI * 2 + rotationOffset;
     const x = Math.cos(angle) * radius;
     const z = Math.sin(angle) * radius;
     vertices.push(x, height / 2, z);
     normals.push(0, 1, 0);
-    // UV для верхней грани (центр в 0.5, 0.5)
-    const u = 0.5 + Math.cos(angle) * 0.5;
-    const v = 0.5 + Math.sin(angle) * 0.5;
+    // UV для верхней грани (центр в 0.5, 0.5) - без поворота для правильного наложения текстуры
+    const uvAngle = (i / segments) * Math.PI * 2;
+    const u = 0.5 + Math.cos(uvAngle) * 0.5;
+    const v = 0.5 + Math.sin(uvAngle) * 0.5;
     uvs.push(u, v);
   }
 
@@ -87,13 +100,15 @@ export function createHexGeometryWithUV(): THREE.BufferGeometry {
   uvs.push(0.5, 0.5);
 
   for (let i = 0; i <= segments; i++) {
-    const angle = (i / segments) * Math.PI * 2;
+    const angle = (i / segments) * Math.PI * 2 + rotationOffset;
     const x = Math.cos(angle) * radius;
     const z = Math.sin(angle) * radius;
     vertices.push(x, -height / 2, z);
     normals.push(0, -1, 0);
-    const u = 0.5 + Math.cos(angle) * 0.5;
-    const v = 0.5 + Math.sin(angle) * 0.5;
+    // UV без поворота для правильного наложения текстуры
+    const uvAngle = (i / segments) * Math.PI * 2;
+    const u = 0.5 + Math.cos(uvAngle) * 0.5;
+    const v = 0.5 + Math.sin(uvAngle) * 0.5;
     uvs.push(u, v);
   }
 
@@ -105,10 +120,10 @@ export function createHexGeometryWithUV(): THREE.BufferGeometry {
   // Боковые грани (боковая текстура)
   const sideStartIndex = vertices.length / 3;
   for (let i = 0; i <= segments; i++) {
-    const angle = (i / segments) * Math.PI * 2;
+    const angle = (i / segments) * Math.PI * 2 + rotationOffset;
     const x = Math.cos(angle) * radius;
     const z = Math.sin(angle) * radius;
-    const nextAngle = ((i + 1) % (segments + 1)) / segments * Math.PI * 2;
+    const nextAngle = ((i + 1) % (segments + 1)) / segments * Math.PI * 2 + rotationOffset;
     const nextX = Math.cos(nextAngle) * radius;
     const nextZ = Math.sin(nextAngle) * radius;
 

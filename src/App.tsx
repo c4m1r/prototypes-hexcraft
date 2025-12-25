@@ -4,9 +4,12 @@ import { GameUI } from './components/GameUI';
 import { MainMenu } from './components/MainMenu';
 import { AboutPage } from './components/AboutPage';
 import { OptionsPage } from './components/OptionsPage';
-import { GameSettings, DEFAULT_SETTINGS } from './types/settings';
+import { WorldSetupMenu } from './components/WorldSetupMenu';
+import { GameSettings, DEFAULT_SETTINGS, WorldSetup } from './types/settings';
+import { LanguageProvider } from './contexts/LanguageContext';
+import { Language } from './utils/i18n';
 
-type Screen = 'menu' | 'game' | 'about' | 'options';
+type Screen = 'menu' | 'worldSetup' | 'game' | 'about' | 'options';
 
 function App() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -16,6 +19,7 @@ function App() {
   const [showDebug, setShowDebug] = useState(false);
   const [showHelpHint, setShowHelpHint] = useState(false);
   const [settings, setSettings] = useState<GameSettings>(DEFAULT_SETTINGS);
+  const [language, setLanguage] = useState<Language>(DEFAULT_SETTINGS.language);
   const [gameState, setGameState] = useState<GameState>({
     playerPosition: { x: 0, y: 0, z: 0 },
     isFlying: true,
@@ -31,6 +35,7 @@ function App() {
 
   useEffect(() => {
     settingsRef.current = settings;
+    setLanguage(settings.language);
   }, [settings]);
 
   useEffect(() => {
@@ -59,8 +64,24 @@ function App() {
   }, [currentScreen]);
 
   const handleNewGame = () => {
+    setCurrentScreen('worldSetup');
+  };
+
+  const handleWorldSetupStart = (worldSetup: WorldSetup) => {
+    // Объединяем настройки мира с текущими настройками игры
+    const mergedSettings: GameSettings = {
+      ...settingsRef.current,
+      renderingMode: worldSetup.renderingMode,
+      seed: worldSetup.seed
+    };
+    settingsRef.current = mergedSettings;
+    setSettings(mergedSettings);
     setShowHelpHint(true);
     setCurrentScreen('game');
+  };
+
+  const handleWorldSetupBack = () => {
+    setCurrentScreen('menu');
   };
 
   const handleLoadGame = () => {
@@ -86,11 +107,16 @@ function App() {
 
   const handleSaveSettings = (newSettings: GameSettings) => {
     setSettings(newSettings);
+    setLanguage(newSettings.language);
     gameRef.current = null;
   };
 
   return (
-    <div className="relative w-full h-screen overflow-hidden">
+    <LanguageProvider language={language} setLanguage={(lang) => {
+      setLanguage(lang);
+      setSettings({ ...settings, language: lang });
+    }}>
+      <div className="relative w-full h-screen overflow-hidden">
       {currentScreen === 'menu' && (
         <MainMenu
           onNewGame={handleNewGame}
@@ -98,6 +124,14 @@ function App() {
           onCoop={handleCoop}
           onOptions={handleOptions}
           onAbout={handleAbout}
+        />
+      )}
+
+      {currentScreen === 'worldSetup' && (
+        <WorldSetupMenu
+          onStart={handleWorldSetupStart}
+          onBack={handleWorldSetupBack}
+          defaultRenderingMode={settings.renderingMode}
         />
       )}
 
@@ -132,7 +166,8 @@ function App() {
           />
         </>
       )}
-    </div>
+      </div>
+    </LanguageProvider>
   );
 }
 

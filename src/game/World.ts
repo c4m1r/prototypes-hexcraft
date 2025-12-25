@@ -55,7 +55,9 @@ export class World {
       this.maxLoadedChunks = requiredChunks;
     }
 
-    this.generator = new ChunkGenerator(this.chunkSize);
+    // Используем seed из настроек, если он указан
+    const worldSeed = finalSettings.seed !== undefined ? finalSettings.seed : Math.floor(Math.random() * 1_000_000_000);
+    this.generator = new ChunkGenerator(this.chunkSize, worldSeed);
     this.generatorSeed = this.generator.getSeed();
 
     if (this.renderingMode === 'modern') {
