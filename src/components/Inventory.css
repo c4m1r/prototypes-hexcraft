@@ -32,11 +32,27 @@
   padding-bottom: 15px;
 }
 
+.inventory-header {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+}
+
 .inventory-header h2 {
   color: #fff;
   margin: 0;
   font-size: 24px;
   text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
+}
+
+.inventory-help {
+  flex: 1;
+  text-align: center;
+}
+
+.inventory-help small {
+  color: #ccc;
+  font-size: 12px;
 }
 
 .close-button {
@@ -83,6 +99,28 @@
   display: flex;
   flex-direction: column;
   gap: 8px;
+  max-height: 200px; /* Ограничение высоты для скроллинга */
+  overflow-y: auto; /* Прокрутка если больше 3 игроков */
+  padding-right: 5px; /* Пространство для полосы прокрутки */
+}
+
+/* Стилизация полосы прокрутки */
+.players-list::-webkit-scrollbar {
+  width: 6px;
+}
+
+.players-list::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 3px;
+}
+
+.players-list::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.3);
+  border-radius: 3px;
+}
+
+.players-list::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.5);
 }
 
 .player-item {
@@ -239,10 +277,18 @@
 .hexagon-slot.drag-over {
   background: rgba(255, 255, 0, 0.3);
   border: 2px solid #ffff00;
+  animation: pulse 0.5s infinite;
 }
 
 .hexagon-slot.dragged-from {
-  opacity: 0.5;
+  opacity: 0.3;
+  transform: scale(0.95);
+}
+
+@keyframes pulse {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.05); }
+  100% { transform: scale(1); }
 }
 
 .hexagon-content {

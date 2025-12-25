@@ -45,6 +45,8 @@ function App() {
     }
   });
 
+  const [inventoryOpen, setInventoryOpen] = useState(false);
+
   // Обработчики инвентаря
   const handleInventoryChange = (inventory: InventorySlot[]) => {
     setGameState(prev => ({
@@ -66,6 +68,21 @@ function App() {
       }
     }));
     gameRef.current?.updateHotbar(hotbar);
+  };
+
+  // Обработчик открытия/закрытия инвентаря
+  const handleInventoryToggle = () => {
+    const newInventoryOpen = !inventoryOpen;
+    setInventoryOpen(newInventoryOpen);
+
+    // Освобождаем/захватываем курсор
+    if (newInventoryOpen) {
+      // Освобождаем курсор для работы с инвентарем
+      document.exitPointerLock();
+    } else {
+      // Захватываем курсор обратно для игры
+      canvasRef.current?.requestPointerLock();
+    }
   };
 
   useEffect(() => {
@@ -276,6 +293,8 @@ function App() {
             generationCode={gameState.generationCode}
             generationStatus={gameState.generationStatus}
             playerState={gameState.playerState}
+            inventoryOpen={inventoryOpen}
+            onInventoryToggle={handleInventoryToggle}
             onInventoryChange={handleInventoryChange}
             onHotbarChange={handleHotbarChange}
           />

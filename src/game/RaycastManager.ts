@@ -24,15 +24,17 @@ export class RaycastManager {
   }
 
   private createHighlightMesh(): void {
-    // Используем ту же геометрию что и у блоков, но как EdgesGeometry для outline
-    const baseGeometry = createHexGeometry();
+    // Создаем геометрию точно как у блоков - с поворотом на 90 градусов
+    const geometry = new THREE.CylinderGeometry(HEX_RADIUS, HEX_RADIUS, HEX_HEIGHT, 6);
+    geometry.rotateY(Math.PI / 2); // 90 градусов - совпадает с блоками
+
     // Увеличиваем размер на небольшой offset чтобы outline был чуть больше блока
     const scale = 1.02; // 2% увеличение
-    baseGeometry.scale(scale, scale, scale);
+    geometry.scale(scale, scale, scale);
 
-    const geometry = new THREE.EdgesGeometry(baseGeometry);
+    const edgesGeometry = new THREE.EdgesGeometry(geometry);
     const material = new THREE.LineBasicMaterial({ color: 0xffffff, linewidth: 2 });
-    this.highlightMesh = new THREE.LineSegments(geometry, material);
+    this.highlightMesh = new THREE.LineSegments(edgesGeometry, material);
     this.highlightMesh.visible = false;
     this.scene.add(this.highlightMesh);
   }

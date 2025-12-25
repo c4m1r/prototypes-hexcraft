@@ -17,6 +17,8 @@ interface GameUIProps {
   generationCode: string;
   generationStatus: string;
   playerState: any; // TODO: типизировать
+  inventoryOpen: boolean;
+  onInventoryToggle: () => void;
   onInventoryChange: (inventory: InventorySlot[]) => void;
   onHotbarChange: (hotbar: InventorySlot[]) => void;
 }
@@ -35,11 +37,12 @@ export function GameUI({
   generationCode,
   generationStatus,
   playerState,
+  inventoryOpen,
+  onInventoryToggle,
   onInventoryChange,
   onHotbarChange
 }: GameUIProps) {
   const [helpVisible, setHelpVisible] = useState(showHelpHint);
-  const [inventoryOpen, setInventoryOpen] = useState(false);
 
   useEffect(() => {
     if (showHelpHint) {
@@ -54,13 +57,13 @@ export function GameUI({
     const handleKeyPress = (event: KeyboardEvent) => {
       if (event.key === 'Tab') {
         event.preventDefault();
-        setInventoryOpen(prev => !prev);
+        onInventoryToggle();
       }
     };
 
     document.addEventListener('keydown', handleKeyPress);
     return () => document.removeEventListener('keydown', handleKeyPress);
-  }, []);
+  }, [onInventoryToggle]);
 
   return (
     <>
@@ -123,7 +126,7 @@ export function GameUI({
       {/* Инвентарь */}
       <Inventory
         isOpen={inventoryOpen}
-        onClose={() => setInventoryOpen(false)}
+        onClose={onInventoryToggle}
         playerState={playerState}
         onInventoryChange={onInventoryChange}
         onHotbarChange={onHotbarChange}

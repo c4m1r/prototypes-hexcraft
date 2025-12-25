@@ -23,11 +23,15 @@ const Inventory: React.FC<InventoryProps> = ({
 }) => {
   const [draggedItem, setDraggedItem] = useState<{ item: Item; count: number; fromSlot: number; fromType: 'inventory' | 'hotbar' } | null>(null);
   const [dragOverSlot, setDragOverSlot] = useState<number | null>(null);
+  // Динамический список игроков (в будущем можно подключить к реальному серверу)
   const [players] = useState<Player[]>([
     { id: '1', name: playerState?.name || 'Player', position: { x: 0, y: 0, z: 0 }, isOnline: true },
     // Моковые игроки для демонстрации
     { id: '2', name: 'Steve', position: { x: 10, y: 0, z: 5 }, isOnline: true },
     { id: '3', name: 'Alex', position: { x: -5, y: 0, z: 10 }, isOnline: false },
+    { id: '4', name: 'Notch', position: { x: 15, y: 0, z: -8 }, isOnline: true },
+    { id: '5', name: 'Jeb', position: { x: -12, y: 0, z: 3 }, isOnline: false },
+    { id: '6', name: 'Dinnerbone', position: { x: 8, y: 0, z: 12 }, isOnline: true },
   ]);
 
   // Инициализация инвентаря если не существует
@@ -84,15 +88,16 @@ const Inventory: React.FC<InventoryProps> = ({
     slot: InventorySlot;
     index: number;
     type: 'inventory' | 'hotbar';
-    onClick: (index: number, type: 'inventory' | 'hotbar') => void;
+    onClick: (event: React.MouseEvent, index: number, type: 'inventory' | 'hotbar') => void;
   }> = ({ slot, index, type, onClick }) => {
-    const isDragOver = dragOverSlot === index && draggedItem?.fromType !== type;
+    const isDragOver = dragOverSlot === index;
     const isDraggedFrom = draggedItem?.fromSlot === index && draggedItem?.fromType === type;
 
     return (
       <div
         className={`hexagon-slot ${isDragOver ? 'drag-over' : ''} ${isDraggedFrom ? 'dragged-from' : ''}`}
-        onClick={() => onClick(index, type)}
+        onClick={(e) => onClick(e, index, type)}
+        onContextMenu={(e) => onClick(e, index, type)}
         onDragOver={(e) => {
           e.preventDefault();
           setDragOverSlot(index);
@@ -129,10 +134,30 @@ const Inventory: React.FC<InventoryProps> = ({
     );
   };
 
-  const handleSlotClick = useCallback((index: number, type: 'inventory' | 'hotbar') => {
-    // TODO: Реализовать логику клика по слоту
-    console.log(`Clicked ${type} slot ${index}`);
-  }, []);
+  const handleSlotClick = useCallback((event: React.MouseEvent, index: number, type: 'inventory' | 'hotbar') => {
+    event.preventDefault();
+
+    const inventory = type === 'inventory' ? playerState.inventory : playerState.hotbar;
+    const slot = inventory[index];
+
+    if (!slot.item) return;
+
+    // Правая кнопка мыши - разделить стак
+    if (event.button === 2 && slot.count > 1) {
+      const halfCount = Math.ceil(slot.count / 2);
+      const remainingCount = slot.count - halfCount;
+
+      // Обновляем текущий слот
+      const newInventory = [...inventory];
+      newInventory[index] = { item: slot.item, count: remainingCount };
+
+      if (type === 'inventory') {
+        onInventoryChange(newInventory);
+      } else {
+        onHotbarChange(newInventory);
+      }
+    }
+  }, [playerState, onInventoryChange, onHotbarChange]);
 
   const handleDrop = useCallback((toIndex: number, toType: 'inventory' | 'hotbar') => {
     if (!draggedItem) return;
@@ -141,17 +166,41 @@ const Inventory: React.FC<InventoryProps> = ({
     const toInventory = toType === 'inventory' ? playerState.inventory : playerState.hotbar;
 
     // Если перетаскиваем в тот же слот - ничего не делаем
-    if (draggedItem.fromSlot === toIndex && draggedItem.fromType === toType) return;
+    if (draggedItem.fromSlot === toIndex && draggedItem.fromType === toType) {
+      setDraggedItem(null);
+      return;
+    }
 
     // Создаем копии инвентарей
     const newFromInventory = [...fromInventory];
     const newToInventory = [...toInventory];
 
-    // Удаляем из исходного слота
-    newFromInventory[draggedItem.fromSlot] = { item: null, count: 0 };
+    const targetSlot = newToInventory[toIndex];
 
-    // Добавляем в целевой слот
-    newToInventory[toIndex] = { item: draggedItem.item, count: draggedItem.count };
+    // Если целевой слот занят тем же предметом - складываем
+    if (targetSlot.item && targetSlot.item.id === draggedItem.item.id) {
+      const maxStackSize = draggedItem.item.maxStackSize;
+      const currentCount = targetSlot.count;
+      const draggedCount = draggedItem.count;
+      const totalCount = currentCount + draggedCount;
+
+      if (totalCount <= maxStackSize) {
+        // Весь стаск помещается
+        newToInventory[toIndex] = { item: draggedItem.item, count: totalCount };
+        newFromInventory[draggedItem.fromSlot] = { item: null, count: 0 };
+      } else {
+        // Частично помещается
+        newToInventory[toIndex] = { item: draggedItem.item, count: maxStackSize };
+        newFromInventory[draggedItem.fromSlot] = {
+          item: draggedItem.item,
+          count: totalCount - maxStackSize
+        };
+      }
+    } else {
+      // Обмен предметами или перемещение в пустой слот
+      newFromInventory[draggedItem.fromSlot] = targetSlot;
+      newToInventory[toIndex] = { item: draggedItem.item, count: draggedItem.count };
+    }
 
     // Обновляем инвентари
     if (draggedItem.fromType === 'inventory') {
@@ -177,6 +226,9 @@ const Inventory: React.FC<InventoryProps> = ({
         {/* Заголовок */}
         <div className="inventory-header">
           <h2>Inventory</h2>
+          <div className="inventory-help">
+            <small>Right-click to split stack • Drag & drop to move items</small>
+          </div>
           <button className="close-button" onClick={onClose}>×</button>
         </div>
 
@@ -222,7 +274,7 @@ const Inventory: React.FC<InventoryProps> = ({
                   slot={slot}
                   index={index}
                   type="inventory"
-                  onClick={handleSlotClick}
+                  onClick={(e, idx, type) => handleSlotClick(e, idx, type)}
                 />
               ))}
             </div>
@@ -238,7 +290,7 @@ const Inventory: React.FC<InventoryProps> = ({
                 slot={slot}
                 index={index}
                 type="hotbar"
-                onClick={handleSlotClick}
+                onClick={(e, idx, type) => handleSlotClick(e, idx, type)}
               />
             ))}
           </div>
