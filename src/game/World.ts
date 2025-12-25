@@ -108,13 +108,23 @@ export class World {
         }
       } else {
         const isLeaves = blockType.id === 'leaves';
+        const isWater = blockType.id === 'water';
+        const isIce = blockType.id === 'ice';
+        
+        // Вода и лед должны быть прозрачными
+        const isTransparent = isLeaves || isWater || isIce;
+        let opacity = 1;
+        if (isLeaves) opacity = 0.75;
+        else if (isWater) opacity = 0.7;
+        else if (isIce) opacity = 0.9;
+        
         this.materials.set(
           blockType.id,
           new THREE.MeshLambertMaterial({
             color: blockType.color,
-            transparent: isLeaves,
-            opacity: isLeaves ? 0.75 : 1,
-            side: isLeaves ? THREE.DoubleSide : THREE.FrontSide
+            transparent: isTransparent,
+            opacity: opacity,
+            side: (isLeaves || isWater || isIce) ? THREE.DoubleSide : THREE.FrontSide
           })
         );
       }
@@ -319,8 +329,15 @@ export class World {
       return;
     }
     
+    // Оптимизация: фильтруем полностью скрытые блоки
+    // Блоки, которые полностью закрыты со всех сторон, не отображаются
+    // Исключение: жидкости и листва всегда отображаются
+    const visibleBlocks = chunk.blocks.filter(block => {
+      return this.isBlockVisible(block, chunk, key);
+    });
+    
     const blocksByType = new Map<string, Block[]>();
-    chunk.blocks.forEach(block => {
+    visibleBlocks.forEach(block => {
       if (!blocksByType.has(block.type)) {
         blocksByType.set(block.type, []);
       }
@@ -377,6 +394,64 @@ export class World {
     }
 
     this.chunkMeshes.set(key, chunkMeshMap);
+  }
+
+  // Проверка видимости блока: блок видим если хотя бы одна грань не закрыта
+  private isBlockVisible(block: Block, chunk: Chunk, chunkKey: string): boolean {
+    // Жидкости и листва всегда видимы
+    const alwaysVisibleTypes = new Set(['water', 'lava', 'ice', 'leaves']);
+    if (alwaysVisibleTypes.has(block.type)) {
+      return true;
+    }
+
+    // Получаем все соседние позиции в гексагональной сетке
+    // В гексагональной сетке у каждого блока 6 соседей в плоскости + вверх/вниз = 8 соседей
+    const neighbors = [
+      // Вверх
+      { q: block.position.q, r: block.position.r, y: block.position.y + 1 },
+      // Вниз
+      { q: block.position.q, r: block.position.r, y: block.position.y - 1 },
+      // 6 соседей в плоскости (гексагональная сетка)
+      { q: block.position.q + 1, r: block.position.r, y: block.position.y },
+      { q: block.position.q - 1, r: block.position.r, y: block.position.y },
+      { q: block.position.q, r: block.position.r + 1, y: block.position.y },
+      { q: block.position.q, r: block.position.r - 1, y: block.position.y },
+      { q: block.position.q + 1, r: block.position.r - 1, y: block.position.y },
+      { q: block.position.q - 1, r: block.position.r + 1, y: block.position.y }
+    ];
+
+    // Проверяем наличие соседей
+    let visibleFaces = 0;
+    for (const neighbor of neighbors) {
+      const neighborKey = `${neighbor.q},${neighbor.r},${neighbor.y}`;
+      
+      // Проверяем в текущем чанке
+      let hasNeighbor = chunk.blockMap.has(neighborKey);
+      
+      // Если сосед не найден в текущем чанке, проверяем соседние чанки
+      if (!hasNeighbor) {
+        // Определяем в каком чанке находится сосед
+        const worldPos = hexToWorld(neighbor.q, neighbor.r, 0);
+        const neighborChunkPos = worldToChunk(worldPos.x, worldPos.z, this.chunkSize);
+        const neighborChunkKey = getChunkKey(neighborChunkPos.q, neighborChunkPos.r);
+        
+        // Если это другой чанк, проверяем его
+        if (neighborChunkKey !== chunkKey) {
+          const neighborChunk = this.chunks.get(neighborChunkKey);
+          if (neighborChunk) {
+            hasNeighbor = neighborChunk.blockMap.has(neighborKey);
+          }
+        }
+      }
+      
+      // Если сосед не найден, эта грань видима
+      if (!hasNeighbor) {
+        visibleFaces++;
+      }
+    }
+
+    // Блок видим если хотя бы одна грань не закрыта
+    return visibleFaces > 0;
   }
 
   getHeightAt(x: number, z: number): number {

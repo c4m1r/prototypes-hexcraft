@@ -235,9 +235,9 @@ export class TextureManager {
     const useCustomShader = texturesDifferent;
 
     // Включаем прозрачность только если она явно задана в конфиге
-    // Для leaves, water, lava всегда включаем прозрачность
+    // Для leaves, water, ice, lava всегда включаем прозрачность
     // Для остальных блоков прозрачность определяется только конфигом
-    const shouldBeTransparent = (config.transparent === true) || blockId === 'leaves' || blockId === 'water' || blockId === 'lava';
+    const shouldBeTransparent = (config.transparent === true) || blockId === 'leaves' || blockId === 'water' || blockId === 'ice' || blockId === 'lava';
     
     if (useCustomShader) {
       return this.createDualTextureMaterial(topTexture, sideTexture, config, shouldBeTransparent);

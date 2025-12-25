@@ -24,7 +24,8 @@ export class RaycastManager {
   }
 
   private createHighlightMesh(): void {
-    const geometry = new THREE.EdgesGeometry(new THREE.CylinderGeometry(1, 1, 1, 6));
+    // Увеличиваем высоту Selection Outline в 2 раза
+    const geometry = new THREE.EdgesGeometry(new THREE.CylinderGeometry(1, 1, 2, 6));
     const material = new THREE.LineBasicMaterial({ color: 0xffffff, linewidth: 2 });
     this.highlightMesh = new THREE.LineSegments(geometry, material);
     this.highlightMesh.visible = false;

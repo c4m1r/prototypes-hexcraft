@@ -100,11 +100,12 @@ export class ChunkGenerator {
     const baseStoneDepth = 5; // Базовая глубина каменного слоя
 
     // ============================================
-    // ШАГ 1 — Карта высот (2D шум)
+    // ШАГ 1 — Карта высот (2D шум) с сглаживанием границ
     // ============================================
     const heightMap = new Map<string, number>();
     const biomeMap = new Map<string, string>();
     
+    // Сначала генерируем все высоты
     for (let q = 0; q < this.chunkSize; q++) {
       for (let r = 0; r < this.chunkSize; r++) {
         const worldQ = offsetQ + q;
@@ -118,6 +119,52 @@ export class ChunkGenerator {
         const biomeConfig = this.biomeConfigs.get(biome) || this.biomeConfigs.get('grassland')!;
         const surfaceHeight = this.getSurfaceHeight(worldQ, worldR, biomeConfig);
         heightMap.set(`${q},${r}`, surfaceHeight);
+      }
+    }
+    
+    // Сглаживаем высоты на границах чанка для предотвращения провалов
+    // Проверяем соседние позиции и усредняем высоты
+    const smoothedHeightMap = new Map<string, number>();
+    for (let q = 0; q < this.chunkSize; q++) {
+      for (let r = 0; r < this.chunkSize; r++) {
+        const currentHeight = heightMap.get(`${q},${r}`) || baseStoneDepth + 5;
+        
+        // Собираем высоты соседних позиций (включая текущую)
+        const neighborHeights: number[] = [currentHeight];
+        
+        // Проверяем соседей в пределах чанка
+        const neighbors = [
+          { q: q - 1, r: r },
+          { q: q + 1, r: r },
+          { q: q, r: r - 1 },
+          { q: q, r: r + 1 },
+          { q: q + 1, r: r - 1 },
+          { q: q - 1, r: r + 1 }
+        ];
+        
+        for (const neighbor of neighbors) {
+          if (neighbor.q >= 0 && neighbor.q < this.chunkSize && 
+              neighbor.r >= 0 && neighbor.r < this.chunkSize) {
+            const neighborHeight = heightMap.get(`${neighbor.q},${neighbor.r}`);
+            if (neighborHeight !== undefined) {
+              neighborHeights.push(neighborHeight);
+            }
+          }
+        }
+        
+        // Усредняем высоты для сглаживания
+        const avgHeight = Math.round(
+          neighborHeights.reduce((sum, h) => sum + h, 0) / neighborHeights.length
+        );
+        
+        smoothedHeightMap.set(`${q},${r}`, avgHeight);
+      }
+    }
+    
+    // Используем сглаженные высоты
+    for (let q = 0; q < this.chunkSize; q++) {
+      for (let r = 0; r < this.chunkSize; r++) {
+        heightMap.set(`${q},${r}`, smoothedHeightMap.get(`${q},${r}`) || baseStoneDepth + 5);
       }
     }
 
@@ -170,6 +217,83 @@ export class ChunkGenerator {
     }
 
     // ============================================
+    // ШАГ 3.5 — Генерация руды в каменных блоках
+    // ============================================
+    // Руда генерируется только в зоне каменных блоков (от y = 0 до baseStoneDepth)
+    // Вероятность увеличивается с глубиной (чем меньше y, тем глубже)
+    // Самый первый низкий блок (y = 0): 40% бронза, 20% серебро, 15% золото
+    for (let q = 0; q < this.chunkSize; q++) {
+      for (let r = 0; r < this.chunkSize; r++) {
+        const worldQ = offsetQ + q;
+        const worldR = offsetR + r;
+        
+        // Генерируем руду только в каменных блоках (от y = 0 до baseStoneDepth)
+        for (let y = 0; y <= baseStoneDepth && y < maxY; y++) {
+          const blockKey = `${worldQ},${worldR},${y}`;
+          const block = blockMap.get(blockKey);
+          
+          if (!block || block.type !== 'stone') continue;
+          
+          // Вычисляем глубину от верхней границы каменного слоя
+          // Чем глубже блок (меньше y), тем выше вероятность руды
+          // y = 0 - самый глубокий каменный блок (максимальная вероятность)
+          // y = baseStoneDepth - самый верхний каменный блок (минимальная вероятность)
+          const maxDepth = baseStoneDepth;
+          
+          // depthFactor: 1.0 на y=0 (самый глубокий), 0.0 на y=baseStoneDepth (самый верхний)
+          const depthFactor = (maxDepth - y) / maxDepth;
+          
+          // Базовые вероятности для самого глубокого блока (y = 0)
+          // 40% бронза, 20% серебро, 15% золото = 75% общая вероятность руды
+          const baseBronzeChance = 0.40; // 40% бронзы на самом глубоком уровне
+          const baseSilverChance = 0.20; // 20% серебра на самом глубоком уровне
+          const baseGoldChance = 0.15;  // 15% золота на самом глубоком уровне
+          const baseOreChance = baseBronzeChance + baseSilverChance + baseGoldChance; // 75% общая вероятность
+          
+          // Вероятность руды увеличивается линейно с глубиной
+          // На y = 0: вероятность = baseOreChance (75% - максимум)
+          // На y = baseStoneDepth: вероятность = baseOreChance * 0.1 (7.5% - минимум)
+          const oreChance = baseOreChance * (0.1 + 0.9 * depthFactor);
+          
+          // Вероятности для каждого типа руды также увеличиваются с глубиной
+          const bronzeChance = baseBronzeChance * (0.1 + 0.9 * depthFactor);
+          const silverChance = baseSilverChance * (0.1 + 0.9 * depthFactor);
+          const goldChance = baseGoldChance * (0.1 + 0.9 * depthFactor);
+          
+          // Генерируем случайное число для определения руды
+          const oreNoise = this.simpleNoise(worldQ * 0.1, worldR * 0.1 + y * 0.2);
+          
+          if (oreNoise <= oreChance) {
+            // Определяем тип руды на основе вероятностей
+            // Вероятности пропорциональны глубине: бронза > серебро > золото
+            let oreType = 'stone'; // По умолчанию остается камень
+            
+            // Нормализуем шум относительно общей вероятности руды
+            const normalizedOreNoise = oreNoise / oreChance;
+            
+            // Распределяем типы руды пропорционально их вероятностям
+            const bronzeRatio = bronzeChance / oreChance;
+            const silverRatio = silverChance / oreChance;
+            const goldRatio = goldChance / oreChance;
+            
+            if (normalizedOreNoise <= bronzeRatio) {
+              // Бронза (самая частая)
+              oreType = 'bronze';
+            } else if (normalizedOreNoise <= bronzeRatio + silverRatio) {
+              // Серебро (средняя частота)
+              oreType = 'silver';
+            } else {
+              // Золото (самая редкая)
+              oreType = 'gold';
+            }
+            
+            block.type = oreType;
+          }
+        }
+      }
+    }
+
+    // ============================================
     // ШАГ 4 — Поверхностные слои биомов
     // ============================================
     // Только твердая местность: камень + поверхностные слои
@@ -178,6 +302,7 @@ export class ChunkGenerator {
       for (let r = 0; r < this.chunkSize; r++) {
         const worldQ = offsetQ + q;
         const worldR = offsetR + r;
+        const s = -worldQ - worldR;
         const biome = biomeMap.get(`${q},${r}`) || 'grassland';
         const biomeConfig = this.biomeConfigs.get(biome) || this.biomeConfigs.get('grassland')!;
         const surfaceHeight = heightMap.get(`${q},${r}`) || baseStoneDepth + 5;
@@ -208,6 +333,29 @@ export class ChunkGenerator {
           // Заменяем тип блока
           block.type = blockType;
         }
+        
+        // Добавляем дополнительный grass блок сверху dirt блока для закрытия stone
+        // Это нужно только если поверхностный блок - grass
+        if (biomeConfig.surfaceBlock === 'grass') {
+          const surfaceBlockKey = `${worldQ},${worldR},${surfaceHeight}`;
+          const surfaceBlock = blockMap.get(surfaceBlockKey);
+          
+          // Если поверхностный блок - grass, добавляем еще один grass блок сверху
+          // чтобы закрыть возможные видимые stone блоки
+          if (surfaceBlock && surfaceBlock.type === 'grass') {
+            const grassAboveY = surfaceHeight + 1;
+            if (grassAboveY < maxY) {
+              const grassAboveKey = `${worldQ},${worldR},${grassAboveY}`;
+              // Добавляем только если блока еще нет
+              if (!blockMap.has(grassAboveKey)) {
+                blocks.push({
+                  type: 'grass',
+                  position: { q: worldQ, r: worldR, s, y: grassAboveY }
+                });
+              }
+            }
+          }
+        }
       }
     }
 
@@ -217,13 +365,55 @@ export class ChunkGenerator {
       finalBlockMap.set(`${block.position.q},${block.position.r},${block.position.y}`, block);
     });
 
+    // ============================================
+    // ШАГ 5 — Валидация: удаление плавающих блоков
+    // ============================================
+    // Удаляем блоки, которые не имеют опоры снизу
+    // Исключаем только блоки на y=0 (они всегда имеют опору)
+    const blocksToRemove: Block[] = [];
+    const passableBlocks = new Set(['water', 'lava', 'leaves', 'ice']); // Эти блоки могут плавать
+    
+    for (const block of blocks) {
+      const y = block.position.y;
+      
+      // Блоки на y=0 всегда имеют опору
+      if (y <= 0) continue;
+      
+      // Проходимые блоки могут плавать
+      if (passableBlocks.has(block.type)) continue;
+      
+      // Проверяем есть ли блок снизу
+      const blockBelowKey = `${block.position.q},${block.position.r},${y - 1}`;
+      const blockBelow = finalBlockMap.get(blockBelowKey);
+      
+      // Если нет блока снизу - удаляем
+      if (!blockBelow) {
+        blocksToRemove.push(block);
+      }
+    }
+    
+    // Удаляем плавающие блоки
+    blocksToRemove.forEach(block => {
+      const index = blocks.indexOf(block);
+      if (index !== -1) {
+        blocks.splice(index, 1);
+        finalBlockMap.delete(`${block.position.q},${block.position.r},${block.position.y}`);
+      }
+    });
+
+    // Пересобираем финальный blockMap после валидации
+    const validatedBlockMap = new Map<string, Block>();
+    blocks.forEach(block => {
+      validatedBlockMap.set(`${block.position.q},${block.position.r},${block.position.y}`, block);
+    });
+
     // Определяем основной биом чанка (центр)
     const centerBiome = biomeMap.get(`${Math.floor(this.chunkSize / 2)},${Math.floor(this.chunkSize / 2)}`) || 'grassland';
 
     return {
       position: { q: chunkQ, r: chunkR },
       blocks,
-      blockMap: finalBlockMap,
+      blockMap: validatedBlockMap,
       biome: centerBiome
     };
   }
@@ -265,9 +455,10 @@ export class ChunkGenerator {
     
     // Применяем диапазон высот биома
     const baseHeight = (biomeConfig.minHeight + biomeConfig.maxHeight) / 2;
-    const heightVariation = biomeConfig.heightVariation;
+    // Ограничиваем вариацию высот от 0 до 3 блоков для более равномерной местности
+    const heightVariation = Math.min(3, biomeConfig.heightVariation);
     
-    // Вычисляем итоговую высоту
+    // Вычисляем итоговую высоту с ограниченной вариацией
     const height = baseHeight + (combinedNoise - 0.5) * heightVariation;
     
     return Math.floor(Math.max(biomeConfig.minHeight, Math.min(biomeConfig.maxHeight, height)));
