@@ -51,9 +51,8 @@ export function axialRound(q: number, r: number): HexCoords {
 }
 
 export function createHexGeometry(): THREE.CylinderGeometry {
-  // Для pointy-top ориентации поворачиваем так, чтобы одна грань была направлена вдоль оси Z
+  // Возвращаем к исходному варианту без поворота - как было изначально
   const geometry = new THREE.CylinderGeometry(HEX_RADIUS, HEX_RADIUS, HEX_HEIGHT, 6);
-  geometry.rotateY(Math.PI / 2); // 90 градусов - поворачиваем чтобы грань была вдоль оси Z
   return geometry;
 }
 
@@ -67,8 +66,8 @@ export function createHexGeometryWithUV(): THREE.BufferGeometry {
   const radius = HEX_RADIUS; // Радиус = size для pointy-top
   const height = HEX_HEIGHT;
   const segments = 6;
-  // Поворачиваем на 90 градусов чтобы грань была направлена вдоль оси Z
-  const rotationOffset = Math.PI / 2;
+  // Возвращаем к исходному варианту без поворота
+  const rotationOffset = 0;
 
   // Верхняя грань (верхняя текстура)
   const topCenterIndex = vertices.length / 3;

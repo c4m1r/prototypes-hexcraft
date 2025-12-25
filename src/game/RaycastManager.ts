@@ -24,9 +24,8 @@ export class RaycastManager {
   }
 
   private createHighlightMesh(): void {
-    // Создаем геометрию точно как у блоков - с поворотом на 90 градусов
+    // Создаем геометрию точно как у блоков - без поворота, как было изначально
     const geometry = new THREE.CylinderGeometry(HEX_RADIUS, HEX_RADIUS, HEX_HEIGHT, 6);
-    geometry.rotateY(Math.PI / 2); // 90 градусов - совпадает с блоками
 
     // Увеличиваем размер на небольшой offset чтобы outline был чуть больше блока
     const scale = 1.02; // 2% увеличение

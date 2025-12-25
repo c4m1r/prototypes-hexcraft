@@ -619,6 +619,9 @@ export class World {
           chunk.blocks.splice(index, 1);
         }
 
+        // Обновляем состояние видимости для соседних блоков
+        this.updateBlockVisibilityAfterRemoval(chunk, q, r, y);
+
         // Recreate meshes
         this.removeChunkMeshes(key);
         this.createChunkMeshes(chunk);
@@ -627,6 +630,38 @@ export class World {
       }
     }
     return null;
+  }
+
+  private updateBlockVisibilityAfterRemoval(chunk: Chunk, removedQ: number, removedR: number, removedY: number): void {
+    // Получаем всех соседей удаленного блока (6 в плоскости + 2 по вертикали)
+    const neighbors = [
+      // В плоскости (гексагональные соседи)
+      { q: removedQ + 1, r: removedR, y: removedY },
+      { q: removedQ - 1, r: removedR, y: removedY },
+      { q: removedQ, r: removedR + 1, y: removedY },
+      { q: removedQ, r: removedR - 1, y: removedY },
+      { q: removedQ + 1, r: removedR - 1, y: removedY },
+      { q: removedQ - 1, r: removedR + 1, y: removedY },
+      // По вертикали
+      { q: removedQ, r: removedR, y: removedY + 1 },
+      { q: removedQ, r: removedR, y: removedY - 1 }
+    ];
+
+    // Проверяем каждый соседний блок и обновляем его видимость
+    for (const neighbor of neighbors) {
+      const neighborBlock = this.getBlockAt(neighbor.q, neighbor.r, neighbor.y);
+      if (neighborBlock) {
+        const blockKey = `${neighbor.q},${neighbor.r},${neighbor.y}`;
+        const isVisible = this.isBlockVisible(neighborBlock, chunk, getChunkKey(chunk.position.q, chunk.position.r));
+
+        // Обновляем состояние видимости
+        if (isVisible) {
+          chunk.visibleBlocks?.add(blockKey);
+        } else {
+          chunk.visibleBlocks?.delete(blockKey);
+        }
+      }
+    }
   }
 
   getBlockAt(q: number, r: number, y: number): Block | null {

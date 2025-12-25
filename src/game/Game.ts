@@ -5,6 +5,7 @@ import { RaycastManager } from './RaycastManager';
 import { DayNightCycle } from './DayNightCycle';
 import { GameSettings } from '../types/settings';
 import { InventorySlot, DroppedItem, ITEMS } from '../types/game';
+import { hexToWorld } from '../utils/hexUtils';
 
 export interface GameState {
   playerPosition: { x: number; y: number; z: number };
