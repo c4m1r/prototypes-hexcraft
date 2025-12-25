@@ -92,82 +92,138 @@ export class ChunkGenerator {
     const blocks: Block[] = [];
     const offsetQ = chunkQ * this.chunkSize;
     const offsetR = chunkR * this.chunkSize;
+    const maxY = 32; // Максимальная глубина генерации
+    const baseStoneDepth = 5; // Базовая глубина каменного слоя (Minecraft rule)
 
-    // Генерируем карту высот и биомов для чанка
+    // ============================================
+    // ШАГ 1 — Карта высот (2D шум, ОДИН проход)
+    // ============================================
+    // Генерируем карту высот поверхности используя 2D шум
+    // Карта высот определяет ТОЛЬКО высоту поверхности
+    // Блоки еще не создаются
     const heightMap = new Map<string, number>();
     const biomeMap = new Map<string, string>();
-    const maxY = 32; // Максимальная глубина генерации
-    const baseStoneDepth = 20; // Базовая глубина каменного слоя
 
-    // ШАГ 1: Определяем биомы и высоты поверхности для всех позиций
     for (let q = 0; q < this.chunkSize; q++) {
       for (let r = 0; r < this.chunkSize; r++) {
         const worldQ = offsetQ + q;
         const worldR = offsetR + r;
+        
+        // Выбираем биом через низкочастотный 2D шум
         const biome = this.selectBiomeRegion(worldQ, worldR);
         biomeMap.set(`${q},${r}`, biome);
         
+        // Генерируем высоту поверхности используя 2D шум
         const biomeConfig = this.biomeConfigs.get(biome) || this.biomeConfigs.get('grassland')!;
         const surfaceHeight = this.getSurfaceHeight(worldQ, worldR, biomeConfig);
         heightMap.set(`${q},${r}`, surfaceHeight);
       }
     }
 
-    // ШАГ 2: Заполняем весь объем чанка грязью (базовый материал)
-    const maxSurfaceHeight = Math.max(...Array.from(heightMap.values()));
-    const fillHeight = Math.max(maxSurfaceHeight + 5, baseStoneDepth + 5);
-    
+    // ============================================
+    // ШАГ 2 — Заполнение твердого мира (БЕЗ пробелов)
+    // ============================================
+    // Для каждой позиции (q, r): Заполняем от y = 0 до surfaceHeight
+    // Это гарантирует ОТСУТСТВИЕ пустого пространства под поверхностью
     for (let q = 0; q < this.chunkSize; q++) {
       for (let r = 0; r < this.chunkSize; r++) {
         const worldQ = offsetQ + q;
         const worldR = offsetR + r;
         const s = -worldQ - worldR;
+        const surfaceHeight = heightMap.get(`${q},${r}`) || baseStoneDepth + 5;
         
-        // Заполняем грязью от y=0 до fillHeight
-        for (let y = 0; y <= fillHeight && y < maxY; y++) {
+        // Заполняем от y = 0 до surfaceHeight
+        for (let y = 0; y <= surfaceHeight && y < maxY; y++) {
           blocks.push({
-            type: 'dirt',
+            type: 'dirt', // Временный материал для заполнения
             position: { q: worldQ, r: worldR, s, y }
           });
         }
       }
     }
 
-    // ШАГ 3: Заменяем блоки на основе шума и биомов
-    this.applyBiomeLayers(blocks, offsetQ, offsetR, heightMap, biomeMap, maxY, baseStoneDepth);
-
-    // ШАГ 4: Генерируем пещеры под землей (заменяем грязь на воздух/удаляем блоки)
-    this.generateCaves(blocks, offsetQ, offsetR, maxY, baseStoneDepth, heightMap);
-
-    // ШАГ 5: Генерируем вулканы с лавой
-    this.generateVolcanoes(blocks, offsetQ, offsetR, heightMap, biomeMap, maxY, baseStoneDepth);
-
-    // ШАГ 6: Генерируем воду (озера/моря/реки) - после пещер и вулканов
-    this.generateLakes(blocks, offsetQ, offsetR, heightMap, biomeMap, maxY);
-
-    // ШАГ 7: Удаляем висящие блоки после всех модификаций
-    this.removeFloatingBlocks(blocks);
-
-    // Генерируем структуры (с проверками наложения)
-    const structureMap = new Set<string>(); // Карта занятых позиций структур
-    this.generateStructures(blocks, offsetQ, offsetR, heightMap, biomeMap, structureMap);
-
-    // Генерируем ресурсы под землей (с проверками наложения)
-    const resourceMap = new Set<string>(); // Карта занятых позиций ресурсов
-    this.generateResources(blocks, offsetQ, offsetR, maxY, biomeMap, resourceMap);
-
-    // Определяем основной биом чанка (по центру)
-    const centerBiome = biomeMap.get(`${Math.floor(this.chunkSize / 2)},${Math.floor(this.chunkSize / 2)}`) || 'grassland';
-
+    // ============================================
+    // ШАГ 3 — Базовый каменный слой (правило Minecraft)
+    // ============================================
+    // От y = 0 до baseStoneDepth → КАМЕНЬ
+    // Этот слой ВСЕГДА твердый
+    // Ничего (вода, лава, воздух) здесь изначально не допускается
     const blockMap = new Map<string, Block>();
     blocks.forEach(block => {
-      blockMap.set(`${block.position.q},${block.position.r},${block.position.y}`, block);
+      const key = `${block.position.q},${block.position.r},${block.position.y}`;
+      blockMap.set(key, block);
     });
+
+    for (let q = 0; q < this.chunkSize; q++) {
+      for (let r = 0; r < this.chunkSize; r++) {
+        const worldQ = offsetQ + q;
+        const worldR = offsetR + r;
+        
+        // Заменяем блоки от y = 0 до baseStoneDepth на КАМЕНЬ
+        for (let y = 0; y <= baseStoneDepth && y < maxY; y++) {
+          const blockKey = `${worldQ},${worldR},${y}`;
+          const block = blockMap.get(blockKey);
+          if (block) {
+            block.type = 'stone';
+          }
+        }
+      }
+    }
+
+    // ============================================
+    // ШАГ 4 — Поверхностные слои биомов (замена, не добавление)
+    // ============================================
+    // Биомы влияют ТОЛЬКО на: Верхний блок, Подповерхностные слои
+    // Биомы НЕ создают дыр
+    this.applyBiomeSurfaceLayers(blocks, offsetQ, offsetR, heightMap, biomeMap, baseStoneDepth, maxY);
+
+    // ============================================
+    // ШАГ 5 — Вырезание пещер (ТОЛЬКО вычитание)
+    // ============================================
+    // Используем 3D шум
+    // Пещеры существуют ТОЛЬКО под поверхностью и над каменным основанием
+    // Пещеры УДАЛЯЮТ блоки, они НЕ размещают новые
+    // Пещеры должны образовывать большие связанные камеры, а не тонкие туннели
+    this.generateCavesStrict(blocks, offsetQ, offsetR, heightMap, baseStoneDepth, maxY);
+
+    // ============================================
+    // ШАГ 6 — Жидкости (ПОСЛЕ пещер)
+    // ============================================
+    // Вода: Заполняет только полости, должна иметь твердый блок снизу ИЛИ быть ограничена камнем
+    // Лава: Появляется только глубоко под землей или внутри вулканических шахт, течет ВНИЗ пока не достигнет камня
+    // Жидкости НИКОГДА не должны плавать
+    this.generateLiquidsStrict(blocks, offsetQ, offsetR, heightMap, biomeMap, baseStoneDepth, maxY);
+
+    // ============================================
+    // ШАГ 7 — Структуры
+    // ============================================
+    // Деревья: Только на траве, деревянный ствол + лиственный навес
+    // Грибы: Рендерятся как 2D спрайты, прикреплены к верхней грани, никогда не занимают 3D пространство блока
+    const structureMap = new Set<string>();
+    this.generateStructuresStrict(blocks, offsetQ, offsetR, heightMap, biomeMap, structureMap, maxY);
+
+    // ============================================
+    // ШАГ 8 — Проверка (ОБЯЗАТЕЛЬНО)
+    // ============================================
+    // Удаляем любой блок, который:
+    // - Не имеет твердого блока непосредственно снизу
+    // - Не является жидкостью или листвой
+    // Этот проход ДОЛЖЕН быть дешевым (одна проверка)
+    this.validateAndRemoveFloatingBlocks(blocks, maxY);
+
+    // Пересобираем blockMap после всех модификаций
+    const finalBlockMap = new Map<string, Block>();
+    blocks.forEach(block => {
+      finalBlockMap.set(`${block.position.q},${block.position.r},${block.position.y}`, block);
+    });
+
+    // Определяем основной биом чанка (центр)
+    const centerBiome = biomeMap.get(`${Math.floor(this.chunkSize / 2)},${Math.floor(this.chunkSize / 2)}`) || 'grassland';
 
     return {
       position: { q: chunkQ, r: chunkR },
       blocks,
-      blockMap,
+      blockMap: finalBlockMap,
       biome: centerBiome
     };
   }
@@ -198,35 +254,36 @@ export class ChunkGenerator {
   }
 
   private getSurfaceHeight(q: number, r: number, biomeConfig: BiomeConfig): number {
-    // Детерминированная высота без шума - используем простую формулу на основе координат
-    // для создания плавного рельефа внутри биома
-    const localQ = q % this.BIOME_SIZE;
-    const localR = r % this.BIOME_SIZE;
-    const centerQ = this.BIOME_SIZE / 2;
-    const centerR = this.BIOME_SIZE / 2;
+    // ШАГ 1 — Карта высот: Генерируем высоту поверхности используя 2D шум
+    // Используем 2D шум для детерминированной генерации высоты
+    const noise1 = this.simpleNoise(q * 0.05, r * 0.05);
+    const noise2 = this.simpleNoise(q * 0.1, r * 0.1);
+    const noise3 = this.simpleNoise(q * 0.2, r * 0.2);
     
-    // Расстояние от центра биома влияет на высоту
-    const distFromCenter = Math.sqrt(
-      Math.pow(localQ - centerQ, 2) + Math.pow(localR - centerR, 2)
-    );
-    const maxDist = Math.sqrt(Math.pow(centerQ, 2) + Math.pow(centerR, 2));
-    const normalizedDist = Math.min(1, distFromCenter / maxDist);
+    // Комбинируем слои шума для плавного рельефа
+    const combinedNoise = noise1 * 0.5 + noise2 * 0.3 + noise3 * 0.2;
     
-    // Высота уменьшается к краям биома
-    const heightVariation = (1 - normalizedDist * 0.3) * biomeConfig.heightVariation;
+    // Применяем диапазон высот биома
     const baseHeight = (biomeConfig.minHeight + biomeConfig.maxHeight) / 2;
+    const heightVariation = biomeConfig.heightVariation;
     
-    return Math.floor(baseHeight + heightVariation * (Math.sin(q * 0.1) + Math.cos(r * 0.1)) * 0.5);
+    // Вычисляем итоговую высоту
+    const height = baseHeight + (combinedNoise - 0.5) * heightVariation;
+    
+    return Math.floor(Math.max(biomeConfig.minHeight, Math.min(biomeConfig.maxHeight, height)));
   }
 
-  private applyBiomeLayers(
+  // ============================================
+  // ШАГ 4 — Поверхностные слои биомов (замена, не добавление)
+  // ============================================
+  private applyBiomeSurfaceLayers(
     blocks: Block[],
     offsetQ: number,
     offsetR: number,
     heightMap: Map<string, number>,
     biomeMap: Map<string, string>,
-    maxY: number,
-    baseStoneDepth: number
+    baseStoneDepth: number,
+    maxY: number
   ): void {
     // Создаем карту блоков для быстрого доступа
     const blockMap = new Map<string, Block>();
@@ -235,7 +292,9 @@ export class ChunkGenerator {
       blockMap.set(key, block);
     });
 
-    // Проходим по всем позициям и заменяем грязь на нужные типы блоков
+    // Заменяем блоки на основе правил биома
+    // Биомы влияют ТОЛЬКО на: Верхний блок, Подповерхностные слои
+    // Биомы НЕ создают дыр
     for (let q = 0; q < this.chunkSize; q++) {
       for (let r = 0; r < this.chunkSize; r++) {
         const worldQ = offsetQ + q;
@@ -244,41 +303,410 @@ export class ChunkGenerator {
         const biomeConfig = this.biomeConfigs.get(biome) || this.biomeConfigs.get('grassland')!;
         const surfaceHeight = heightMap.get(`${q},${r}`) || baseStoneDepth + 5;
 
-        // Заменяем блоки от поверхности вниз
-        for (let y = surfaceHeight; y >= 0 && y < maxY; y--) {
+        // Заменяем только блоки выше baseStoneDepth (каменный слой уже установлен)
+        for (let y = baseStoneDepth + 1; y <= surfaceHeight && y < maxY; y--) {
           const blockKey = `${worldQ},${worldR},${y}`;
           const block = blockMap.get(blockKey);
           
           if (!block) continue;
 
-          let blockType = 'dirt'; // По умолчанию остается грязью
+          const depthFromSurface = surfaceHeight - y;
+          let blockType = 'dirt'; // По умолчанию
 
-          // Базовый каменный слой (y <= baseStoneDepth)
-          if (y <= baseStoneDepth) {
-            blockType = 'stone';
+          // Верхний блок
+          if (y === surfaceHeight) {
+            blockType = biomeConfig.surfaceBlock;
           } else {
-            // Поверхностные слои биома
-            const depthFromSurface = surfaceHeight - y;
-            
-            // Поверхностный блок
-            if (y === surfaceHeight) {
-              blockType = biomeConfig.surfaceBlock;
-            } else {
-              // Определяем тип блока на основе глубины от поверхности
-              for (const layer of biomeConfig.subsurfaceLayers) {
-                if (depthFromSurface < layer.depth) {
-                  blockType = layer.block;
-                  break;
-                }
+            // Подповерхностные слои на основе правил биома
+      for (const layer of biomeConfig.subsurfaceLayers) {
+              if (depthFromSurface < layer.depth) {
+          blockType = layer.block;
+          break;
               }
             }
           }
 
-          // Заменяем тип блока
+          // Заменяем тип блока (замена, не добавление)
           block.type = blockType;
         }
       }
     }
+  }
+
+  // ============================================
+  // ШАГ 5 — Вырезание пещер (ТОЛЬКО вычитание)
+  // ============================================
+  private generateCavesStrict(
+    blocks: Block[],
+    offsetQ: number,
+    offsetR: number,
+    heightMap: Map<string, number>,
+    baseStoneDepth: number,
+    maxY: number
+  ): void {
+    const blockMap = new Map<string, Block>();
+    blocks.forEach(block => {
+      const key = `${block.position.q},${block.position.r},${block.position.y}`;
+      blockMap.set(key, block);
+    });
+
+    const cavesToRemove = new Set<string>();
+
+    // Используем 3D шум для генерации пещер
+    // Пещеры существуют ТОЛЬКО под поверхностью и над каменным основанием
+    // Пещеры УДАЛЯЮТ блоки, они НЕ размещают новые
+    // Пещеры должны образовывать большие связанные камеры, а не тонкие туннели
+    
+    for (let q = 0; q < this.chunkSize; q++) {
+      for (let r = 0; r < this.chunkSize; r++) {
+        const worldQ = offsetQ + q;
+        const worldR = offsetR + r;
+        const surfaceHeight = heightMap.get(`${q},${r}`) || baseStoneDepth + 5;
+        
+        // Пещеры только под поверхностью и над каменным основанием
+        const caveStartY = baseStoneDepth + 1;
+        const caveEndY = surfaceHeight - 1;
+        
+        for (let y = caveStartY; y <= caveEndY && y < maxY; y++) {
+          // Используем 3D шум для больших связанных камер
+          const caveNoise = this.caveNoise3D(worldQ * 0.05, worldR * 0.05, y * 0.06);
+          const caveShape = this.caveNoise3D(worldQ * 0.08, worldR * 0.08, y * 0.1);
+          
+          // Фактор глубины - больше пещер глубже
+          const depthFactor = Math.max(0, (y - baseStoneDepth) / (maxY - baseStoneDepth));
+          const caveThreshold = 0.4 - depthFactor * 0.2; // Больше пещер глубже
+          
+          // Создаем большие связанные камеры
+          if (caveNoise > caveThreshold && caveShape > 0.25) {
+            const blockKey = `${worldQ},${worldR},${y}`;
+            if (blockMap.has(blockKey)) {
+              cavesToRemove.add(blockKey);
+              
+              // Расширяем камеру проверяя соседей (для связности)
+              for (let dq = -1; dq <= 1; dq++) {
+                for (let dr = -1; dr <= 1; dr++) {
+                  for (let dy = -1; dy <= 1; dy++) {
+                    if (dq === 0 && dr === 0 && dy === 0) continue;
+                    
+                    const neighborQ = worldQ + dq;
+                    const neighborR = worldR + dr;
+                    const neighborY = y + dy;
+                    const neighborKey = `${neighborQ},${neighborR},${neighborY}`;
+                    
+                    // Проверяем границы
+                    if (neighborY > baseStoneDepth && neighborY < surfaceHeight && neighborY < maxY) {
+                      const neighborNoise = this.caveNoise3D(neighborQ * 0.05, neighborR * 0.05, neighborY * 0.06);
+                      if (neighborNoise > caveThreshold - 0.15 && blockMap.has(neighborKey)) {
+                        cavesToRemove.add(neighborKey);
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+
+    // Удаляем блоки пещер (ТОЛЬКО вычитание)
+    const blocksToRemove: Block[] = [];
+    blocks.forEach(block => {
+      const blockKey = `${block.position.q},${block.position.r},${block.position.y}`;
+      if (cavesToRemove.has(blockKey)) {
+        blocksToRemove.push(block);
+      }
+    });
+
+    blocksToRemove.forEach(block => {
+      const index = blocks.indexOf(block);
+      if (index !== -1) {
+        blocks.splice(index, 1);
+      }
+    });
+  }
+
+  // ============================================
+  // ШАГ 6 — Жидкости (ПОСЛЕ пещер)
+  // ============================================
+  private generateLiquidsStrict(
+    blocks: Block[],
+    offsetQ: number,
+    offsetR: number,
+    heightMap: Map<string, number>,
+    biomeMap: Map<string, string>,
+    baseStoneDepth: number,
+    maxY: number
+  ): void {
+    const blockMap = new Map<string, Block>();
+    blocks.forEach(block => {
+      const key = `${block.position.q},${block.position.r},${block.position.y}`;
+      blockMap.set(key, block);
+    });
+
+    // Вода: Заполняет только полости, должна иметь твердый блок снизу ИЛИ быть ограничена камнем
+    // Лава: Появляется только глубоко под землей или внутри вулканических шахт, течет ВНИЗ пока не достигнет камня
+    // Жидкости НИКОГДА не должны плавать
+
+    // Генерируем воду в полостях
+    for (let q = 0; q < this.chunkSize; q++) {
+      for (let r = 0; r < this.chunkSize; r++) {
+        const worldQ = offsetQ + q;
+        const worldR = offsetR + r;
+        const surfaceHeight = heightMap.get(`${q},${r}`) || baseStoneDepth + 5;
+        const biome = biomeMap.get(`${q},${r}`) || 'grassland';
+        
+        // Проверяем полости для воды (пустые пространства под поверхностью)
+        for (let y = baseStoneDepth + 1; y <= surfaceHeight && y < maxY; y++) {
+          const blockKey = `${worldQ},${worldR},${y}`;
+          
+          // Если эта позиция пуста (пещера) и ниже поверхности
+          if (!blockMap.has(blockKey) && y < surfaceHeight) {
+            // Проверяем есть ли твердый блок снизу ИЛИ каменное основание
+            const blockBelowKey = `${worldQ},${worldR},${y - 1}`;
+            const blockBelow = blockMap.get(blockBelowKey);
+            const hasSolidBelow = blockBelow && blockBelow.type === 'stone';
+            const isOnStoneBase = y - 1 === baseStoneDepth;
+            
+            // Вода может заполнить только если есть твердый блок снизу или на каменном основании
+            if (hasSolidBelow || isOnStoneBase) {
+              // Проверяем ограничена ли (есть блоки вокруг или камень)
+              let isBounded = false;
+              if (y <= baseStoneDepth + 1) {
+                isBounded = true; // На каменном основании
+      } else {
+                // Проверяем соседей
+                for (let dq = -1; dq <= 1; dq++) {
+                  for (let dr = -1; dr <= 1; dr++) {
+                    if (dq === 0 && dr === 0) continue;
+                    const neighborKey = `${worldQ + dq},${worldR + dr},${y}`;
+                    if (blockMap.has(neighborKey)) {
+                      isBounded = true;
+        break;
+                    }
+                  }
+                  if (isBounded) break;
+                }
+              }
+              
+              if (isBounded) {
+                // Определяем тип воды на основе биома
+                let liquidType = 'water';
+                if (biome === 'frozen' || biome === 'snow') {
+                  const iceNoise = this.simpleNoise(worldQ * 0.1, worldR * 0.1);
+                  liquidType = iceNoise > 0.5 ? 'ice' : 'water';
+                }
+                
+                blocks.push({
+                  type: liquidType,
+                  position: { q: worldQ, r: worldR, s: -worldQ - worldR, y }
+                });
+                blockMap.set(blockKey, { type: liquidType, position: { q: worldQ, r: worldR, s: -worldQ - worldR, y } });
+              }
+            }
+          }
+        }
+      }
+    }
+
+    // Генерируем лаву (глубоко под землей или вулканические шахты)
+    for (let q = 0; q < this.chunkSize; q++) {
+      for (let r = 0; r < this.chunkSize; r++) {
+        const worldQ = offsetQ + q;
+        const worldR = offsetR + r;
+        const biome = biomeMap.get(`${q},${r}`) || 'grassland';
+        
+        // Лава только в каменном биоме или глубоко под землей
+        if (biome === 'stone') {
+          const surfaceHeight = heightMap.get(`${q},${r}`) || baseStoneDepth + 5;
+          const volcanoNoise = this.simpleNoise(worldQ * 0.02, worldR * 0.02);
+          
+          // Вулканические шахты в каменном биоме
+          if (volcanoNoise > 0.92) {
+            // Создаем вулканическую шахту - лава течет ВНИЗ пока не достигнет камня
+            for (let y = surfaceHeight + 3; y > baseStoneDepth && y >= 0 && y < maxY; y--) {
+              const blockKey = `${worldQ},${worldR},${y}`;
+              
+              // Останавливаемся если достигли каменного основания
+              if (y - 1 === baseStoneDepth) {
+                break;
+              }
+              
+              // Заменяем или добавляем лаву
+              if (blockMap.has(blockKey)) {
+                const block = blockMap.get(blockKey)!;
+                if (block.type !== 'stone') {
+                  block.type = 'lava';
+                }
+              } else {
+                blocks.push({
+                  type: 'lava',
+                  position: { q: worldQ, r: worldR, s: -worldQ - worldR, y }
+                });
+                blockMap.set(blockKey, { type: 'lava', position: { q: worldQ, r: worldR, s: -worldQ - worldR, y } });
+              }
+            }
+          }
+        }
+        
+        // Глубокие подземные лавовые бассейны
+        const deepLavaY = baseStoneDepth + 2;
+        if (deepLavaY < maxY) {
+          const deepLavaNoise = this.simpleNoise(worldQ * 0.03, worldR * 0.03 + deepLavaY * 0.1);
+          if (deepLavaNoise > 0.95) {
+            const blockKey = `${worldQ},${worldR},${deepLavaY}`;
+            if (!blockMap.has(blockKey)) {
+              blocks.push({
+                type: 'lava',
+                position: { q: worldQ, r: worldR, s: -worldQ - worldR, y: deepLavaY }
+              });
+              blockMap.set(blockKey, { type: 'lava', position: { q: worldQ, r: worldR, s: -worldQ - worldR, y: deepLavaY } });
+            }
+          }
+        }
+      }
+    }
+  }
+
+  // ============================================
+  // ШАГ 7 — Структуры
+  // ============================================
+  private generateStructuresStrict(
+    blocks: Block[],
+    offsetQ: number,
+    offsetR: number,
+    heightMap: Map<string, number>,
+    biomeMap: Map<string, string>,
+    structureMap: Set<string>,
+    maxY: number
+  ): void {
+    const blockMap = new Map<string, Block>();
+    blocks.forEach(block => {
+      const key = `${block.position.q},${block.position.r},${block.position.y}`;
+      blockMap.set(key, block);
+    });
+
+    // Деревья: Только на траве, деревянный ствол + лиственный навес
+    // Грибы: Рендерятся как 2D спрайты, прикреплены к верхней грани, никогда не занимают 3D пространство блока
+    
+    for (let q = 0; q < this.chunkSize; q++) {
+      for (let r = 0; r < this.chunkSize; r++) {
+        const worldQ = offsetQ + q;
+        const worldR = offsetR + r;
+        const biome = biomeMap.get(`${q},${r}`) || 'grassland';
+        const surfaceHeight = heightMap.get(`${q},${r}`) || 10;
+        
+        const structureKey = `${worldQ},${worldR}`;
+        if (structureMap.has(structureKey)) continue;
+
+        // Деревья только в биоме луга на блоках травы
+        if (biome === 'grassland') {
+          const surfaceBlockKey = `${worldQ},${worldR},${surfaceHeight}`;
+          const surfaceBlock = blockMap.get(surfaceBlockKey);
+          
+          if (surfaceBlock && surfaceBlock.type === 'grass') {
+            const treeNoise = this.simpleNoise(worldQ * 0.1, worldR * 0.1);
+            if (treeNoise > 0.88) {
+              // Генерируем дерево
+              const trunkHeight = 4 + Math.floor(this.simpleNoise(worldQ * 0.2, worldR * 0.2) * 3);
+              
+              // Деревянный ствол
+              for (let i = 1; i <= trunkHeight && surfaceHeight + i < maxY; i++) {
+                const trunkY = surfaceHeight + i;
+                const trunkKey = `${worldQ},${worldR},${trunkY}`;
+                
+                if (!blockMap.has(trunkKey)) {
+                  blocks.push({
+                    type: 'wood',
+                    position: { q: worldQ, r: worldR, s: -worldQ - worldR, y: trunkY }
+                  });
+                  blockMap.set(trunkKey, { type: 'wood', position: { q: worldQ, r: worldR, s: -worldQ - worldR, y: trunkY } });
+                }
+              }
+              
+              // Лиственный навес
+              const canopyY = surfaceHeight + trunkHeight;
+              const canopyRadius = 2;
+              for (let dq = -canopyRadius; dq <= canopyRadius; dq++) {
+                for (let dr = -canopyRadius; dr <= canopyRadius; dr++) {
+                  const dist = Math.sqrt(dq * dq + dr * dr);
+                  if (dist <= canopyRadius && (dq !== 0 || dr !== 0)) {
+                    const leafQ = worldQ + dq;
+                    const leafR = worldR + dr;
+                    const leafY = canopyY;
+                    const leafKey = `${leafQ},${leafR},${leafY}`;
+                    
+                    if (!blockMap.has(leafKey) && leafY < maxY) {
+                      blocks.push({
+                        type: 'leaves',
+                        position: { q: leafQ, r: leafR, s: -leafQ - leafR, y: leafY }
+                      });
+                      blockMap.set(leafKey, { type: 'leaves', position: { q: leafQ, r: leafR, s: -leafQ - leafR, y: leafY } });
+                      structureMap.add(`${leafQ},${leafR}`);
+                    }
+                  }
+                }
+              }
+              
+              structureMap.add(structureKey);
+            }
+          }
+          
+          // Грибы (2D спрайты - просто отмечаем позицию, рендеринг обрабатывается в другом месте)
+          const mushroomNoise = this.simpleNoise(worldQ * 0.15, worldR * 0.15);
+          if (mushroomNoise > 0.93 && surfaceBlock && surfaceBlock.type === 'grass') {
+            // Гриб рендерится как 2D спрайт, не занимает 3D пространство
+            // Просто отмечаем позицию для системы рендеринга
+            structureMap.add(structureKey);
+          }
+        }
+      }
+    }
+  }
+
+  // ============================================
+  // ШАГ 8 — Проверка (ОБЯЗАТЕЛЬНО)
+  // ============================================
+  private validateAndRemoveFloatingBlocks(blocks: Block[], maxY: number): void {
+    const blockMap = new Map<string, Block>();
+    blocks.forEach(block => {
+      const key = `${block.position.q},${block.position.r},${block.position.y}`;
+      blockMap.set(key, block);
+    });
+
+    const blocksToRemove: Block[] = [];
+    const passableBlocks = new Set(['water', 'lava', 'leaves', 'ice']); // Жидкости и листва могут плавать
+
+    // Удаляем любой блок, который:
+    // - Не имеет твердого блока непосредственно снизу
+    // - Не является жидкостью или листвой
+    // Этот проход ДОЛЖЕН быть дешевым (одна проверка)
+    blocks.forEach(block => {
+      const y = block.position.y;
+      
+      // Блоки на y=0 всегда имеют опору (каменное основание)
+      if (y <= 0) return;
+      
+      // Жидкости и листва могут плавать
+      if (passableBlocks.has(block.type)) return;
+      
+      // Проверяем есть ли твердый блок непосредственно снизу
+      const blockBelowKey = `${block.position.q},${block.position.r},${y - 1}`;
+      const blockBelow = blockMap.get(blockBelowKey);
+      
+      // Если нет твердого блока снизу, удаляем его
+      if (!blockBelow || passableBlocks.has(blockBelow.type)) {
+        blocksToRemove.push(block);
+      }
+    });
+
+    // Удаляем висящие блоки
+    blocksToRemove.forEach(block => {
+      const index = blocks.indexOf(block);
+      if (index !== -1) {
+        blocks.splice(index, 1);
+      }
+    });
   }
 
   private generateCaves(blocks: Block[], offsetQ: number, offsetR: number, maxY: number, baseStoneDepth: number, heightMap: Map<string, number>): void {
