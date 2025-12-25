@@ -240,28 +240,33 @@
 /* Панель персонажа и экипировки */
 .character-equipment-panel {
   display: flex;
-  gap: 30px;
+  gap: 40px;
   align-items: flex-start;
+  justify-content: center;
 }
 
 .equipment-panel {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  width: 200px;
+  align-items: center;
 }
 
-.equipment-row {
+.equipment-panel.armor-panel,
+.equipment-panel.vanity-panel {
+  width: 60px;
+}
+
+.equipment-column {
   display: flex;
-  gap: 6px;
-  justify-content: space-between;
+  flex-direction: column;
+  gap: 8px;
 }
 
-.equipment-row.artifacts-row {
+.accessories-row {
+  display: flex;
+  gap: 8px;
+  margin-top: 20px;
   justify-content: center;
-  margin-top: 8px;
-  padding-top: 8px;
-  border-top: 1px solid rgba(255, 255, 255, 0.2);
 }
 
 .equipment-slot {
@@ -311,29 +316,34 @@
 /* Панель инвентаря */
 .inventory-panel {
   flex: 1;
+  display: flex;
+  justify-content: center;
 }
 
-.inventory-grid {
-  display: grid;
-  grid-template-columns: repeat(9, 1fr);
-  gap: 2px;
-  margin: -5px;
-  padding: 5px;
+.inventory-honeycomb {
+  position: relative;
+  width: 520px; /* 10 гексагонов * 50px + смещения */
+  height: 180px; /* 3 ряда * 43px * 1.4 для вертикального spacing */
+  margin: 20px 0;
 }
 
 /* Хоткеи */
 .hotbar-panel {
   border-top: 1px solid #444;
   padding-top: 15px;
+  display: flex;
+  justify-content: center;
 }
 
-.hotbar-grid {
-  display: grid;
-  grid-template-columns: repeat(9, 1fr);
-  gap: 2px;
-  justify-items: center;
-  margin: -5px;
-  padding: 5px;
+.hotbar-honeycomb {
+  position: relative;
+  width: 520px; /* 9 гексагонов в первом ряду + смещения */
+  height: 90px; /* 1-2 ряда */
+  margin: 10px 0;
+}
+
+.hexagon-wrapper {
+  transition: all 0.2s;
 }
 
 /* Гексагональные слоты */
@@ -478,8 +488,9 @@
     order: 1;
   }
 
-  .character-panel {
-    width: 100%;
+  .character-equipment-panel {
+    flex-direction: column;
+    gap: 20px;
     order: 2;
   }
 
@@ -487,12 +498,32 @@
     order: 3;
   }
 
-  .inventory-grid {
-    grid-template-columns: repeat(6, 1fr);
+  .inventory-honeycomb {
+    width: 320px; /* 6 гексагонов для мобильных */
+    height: 200px;
   }
 
-  .hotbar-grid {
-    grid-template-columns: repeat(6, 1fr);
+  .hotbar-honeycomb {
+    width: 320px;
+    height: 120px;
+  }
+
+  .equipment-panel.armor-panel,
+  .equipment-panel.vanity-panel {
+    width: 100%;
+    flex-direction: row;
+    justify-content: center;
+  }
+
+  .equipment-column {
+    flex-direction: row;
+    gap: 12px;
+  }
+
+  .accessories-row {
+    margin-top: 15px;
+    flex-wrap: wrap;
+    gap: 12px;
   }
 
   .hexagon-slot {

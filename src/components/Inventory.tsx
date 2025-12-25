@@ -12,8 +12,9 @@ interface InventoryProps {
   onItemPickup?: (item: Item) => void;
 }
 
-const INVENTORY_SIZE = 27;
-const HOTBAR_SIZE = 9;
+  const INVENTORY_SIZE = 27;
+  const HOTBAR_SIZE = 9;
+  const HEXAGONS_PER_ROW = 10;
 
 const Inventory: React.FC<InventoryProps> = ({
   isOpen,
@@ -32,6 +33,29 @@ const Inventory: React.FC<InventoryProps> = ({
   const [players] = useState<Player[]>([
     { id: '1', name: playerState?.name || 'Player', position: { x: 0, y: 0, z: 0 }, isOnline: true }
   ]);
+
+  // Функция для расчета позиций гексагонов в honeycomb паттерне
+  const calculateHexagonPositions = (totalHexagons: number, hexagonsPerRow: number) => {
+    const positions: { row: number; col: number; x: number; y: number }[] = [];
+    const hexWidth = 50;
+    const hexHeight = 43;
+    const horizontalSpacing = hexWidth * 0.75; // 75% перекрытия для honeycomb
+    const verticalSpacing = hexHeight * 0.866; // sin(60°) для вертикального смещения
+
+    for (let i = 0; i < totalHexagons; i++) {
+      const row = Math.floor(i / hexagonsPerRow);
+      const col = i % hexagonsPerRow;
+
+      // Смещение каждого второго ряда для honeycomb паттерна
+      const xOffset = row % 2 === 0 ? 0 : horizontalSpacing / 2;
+      const x = col * horizontalSpacing + xOffset;
+      const y = row * verticalSpacing;
+
+      positions.push({ row, col, x, y });
+    }
+
+    return positions;
+  };
 
   // Инициализация инвентаря если не существует
   useEffect(() => {
@@ -282,7 +306,33 @@ const Inventory: React.FC<InventoryProps> = ({
 
           {/* Персонаж и экипировка */}
           <div className="character-equipment-panel">
-            {/* Персонаж - левая сторона */}
+            {/* Левая экипировка - функциональная броня */}
+            <div className="equipment-panel armor-panel">
+              <div className="equipment-column">
+                <EquipmentSlot
+                  slot={playerState.equipment?.[0] || { type: 'helmet', item: null, name: t.inventory.helmet }}
+                  onClick={() => {}}
+                />
+                <EquipmentSlot
+                  slot={playerState.equipment?.[1] || { type: 'chestplate', item: null, name: t.inventory.chestplate }}
+                  onClick={() => {}}
+                />
+                <EquipmentSlot
+                  slot={playerState.equipment?.[2] || { type: 'leggings', item: null, name: t.inventory.leggings }}
+                  onClick={() => {}}
+                />
+                <EquipmentSlot
+                  slot={playerState.equipment?.[3] || { type: 'boots', item: null, name: t.inventory.boots }}
+                  onClick={() => {}}
+                />
+                <EquipmentSlot
+                  slot={playerState.equipment?.[4] || { type: 'cape', item: null, name: t.inventory.cape }}
+                  onClick={() => {}}
+                />
+              </div>
+            </div>
+
+            {/* Персонаж - центр */}
             <div className="character-panel">
               <div className="character-preview">
                 <div className="character-body">
@@ -292,78 +342,49 @@ const Inventory: React.FC<InventoryProps> = ({
                 </div>
               </div>
               <div className="character-name">{playerState?.name || 'Player'}</div>
+
+              {/* Аксессуары по центру под персонажем */}
+              <div className="accessories-row">
+                <EquipmentSlot
+                  slot={playerState.equipment?.[9] || { type: 'amulet', item: null, name: t.inventory.amulet }}
+                  onClick={() => {}}
+                />
+                <EquipmentSlot
+                  slot={playerState.equipment?.[10] || { type: 'ring1', item: null, name: t.inventory.ring1 }}
+                  onClick={() => {}}
+                />
+                <EquipmentSlot
+                  slot={playerState.equipment?.[11] || { type: 'ring2', item: null, name: t.inventory.ring2 }}
+                  onClick={() => {}}
+                />
+                <EquipmentSlot
+                  slot={playerState.equipment?.[12] || { type: 'artifact1', item: null, name: t.inventory.artifact1 }}
+                  onClick={() => {}}
+                />
+                <EquipmentSlot
+                  slot={playerState.equipment?.[13] || { type: 'artifact2', item: null, name: t.inventory.artifact2 }}
+                  onClick={() => {}}
+                />
+              </div>
             </div>
 
-            {/* Экипировка - правая сторона */}
-            <div className="equipment-panel">
-              {/* Шлем и артефакты */}
-              <div className="equipment-row">
+            {/* Правая экипировка - косметическая одежда (vanity) */}
+            <div className="equipment-panel vanity-panel">
+              <div className="equipment-column">
                 <EquipmentSlot
-                  slot={playerState.equipment?.[0] || { type: 'helmet', item: null, name: t.inventory.helmet }}
+                  slot={playerState.equipment?.[5] || { type: 'head', item: null, name: t.inventory.head }}
                   onClick={() => {}}
                 />
                 <EquipmentSlot
-                  slot={playerState.equipment?.[5] || { type: 'artifact1', item: null, name: t.inventory.artifact1 }}
-                  onClick={() => {}}
-                />
-              </div>
-
-              {/* Нагрудник и vanity (костюм поверх брони) */}
-              <div className="equipment-row">
-                <EquipmentSlot
-                  slot={playerState.equipment?.[1] || { type: 'chestplate', item: null, name: t.inventory.chestplate }}
+                  slot={playerState.equipment?.[6] || { type: 'chest', item: null, name: t.inventory.chest }}
                   onClick={() => {}}
                 />
                 <EquipmentSlot
-                  slot={playerState.equipment?.[8] || { type: 'vanity1', item: null, name: t.inventory.vanity1 }}
-                  onClick={() => {}}
-                />
-              </div>
-
-              {/* Поножи и vanity */}
-              <div className="equipment-row">
-                <EquipmentSlot
-                  slot={playerState.equipment?.[2] || { type: 'leggings', item: null, name: t.inventory.leggings }}
+                  slot={playerState.equipment?.[7] || { type: 'legs', item: null, name: t.inventory.legs }}
                   onClick={() => {}}
                 />
                 <EquipmentSlot
-                  slot={playerState.equipment?.[9] || { type: 'vanity2', item: null, name: t.inventory.vanity2 }}
-                  onClick={() => {}}
-                />
-              </div>
-
-              {/* Ботинки и vanity */}
-              <div className="equipment-row">
-                <EquipmentSlot
-                  slot={playerState.equipment?.[3] || { type: 'boots', item: null, name: t.inventory.boots }}
-                  onClick={() => {}}
-                />
-                <EquipmentSlot
-                  slot={playerState.equipment?.[10] || { type: 'vanity3', item: null, name: t.inventory.vanity3 }}
-                  onClick={() => {}}
-                />
-              </div>
-
-              {/* Плащ и vanity */}
-              <div className="equipment-row">
-                <EquipmentSlot
-                  slot={playerState.equipment?.[4] || { type: 'cape', item: null, name: t.inventory.cape }}
-                  onClick={() => {}}
-                />
-                <EquipmentSlot
-                  slot={playerState.equipment?.[11] || { type: 'vanity4', item: null, name: t.inventory.vanity4 }}
-                  onClick={() => {}}
-                />
-              </div>
-
-              {/* Артефакты по центру */}
-              <div className="equipment-row artifacts-row">
-                <EquipmentSlot
-                  slot={playerState.equipment?.[6] || { type: 'artifact2', item: null, name: t.inventory.artifact2 }}
-                  onClick={() => {}}
-                />
-                <EquipmentSlot
-                  slot={playerState.equipment?.[7] || { type: 'artifact3', item: null, name: t.inventory.artifact3 }}
+                  slot={playerState.equipment?.[8] || { type: 'cape_vanity', item: null, name: t.inventory.cape_vanity }}
                   onClick={() => {}}
                 />
               </div>
@@ -372,32 +393,60 @@ const Inventory: React.FC<InventoryProps> = ({
 
           {/* Инвентарь */}
           <div className="inventory-panel">
-            <div className="inventory-grid">
-              {playerState.inventory?.map((slot, index) => (
-                <HexagonSlot
-                  key={`inv-${index}`}
-                  slot={slot}
-                  index={index}
-                  type="inventory"
-                  onClick={(e, idx, type) => handleSlotClick(e, idx, type)}
-                />
-              ))}
+            <div className="inventory-honeycomb">
+              {playerState.inventory?.map((slot, index) => {
+                const positions = calculateHexagonPositions(INVENTORY_SIZE, HEXAGONS_PER_ROW);
+                const pos = positions[index] || { x: 0, y: 0 };
+
+                return (
+                  <div
+                    key={`inv-${index}`}
+                    className="hexagon-wrapper"
+                    style={{
+                      position: 'absolute',
+                      left: `${pos.x}px`,
+                      top: `${pos.y}px`,
+                    }}
+                  >
+                    <HexagonSlot
+                      slot={slot}
+                      index={index}
+                      type="inventory"
+                      onClick={(e, idx, type) => handleSlotClick(e, idx, type)}
+                    />
+                  </div>
+                );
+              })}
             </div>
           </div>
         </div>
 
         {/* Хоткеи */}
         <div className="hotbar-panel">
-          <div className="hotbar-grid">
-            {playerState.hotbar?.map((slot, index) => (
-              <HexagonSlot
-                key={`hot-${index}`}
-                slot={slot}
-                index={index}
-                type="hotbar"
-                onClick={(e, idx, type) => handleSlotClick(e, idx, type)}
-              />
-            ))}
+          <div className="hotbar-honeycomb">
+            {playerState.hotbar?.map((slot, index) => {
+              const positions = calculateHexagonPositions(HOTBAR_SIZE, HEXAGONS_PER_ROW);
+              const pos = positions[index] || { x: 0, y: 0 };
+
+              return (
+                <div
+                  key={`hot-${index}`}
+                  className="hexagon-wrapper"
+                  style={{
+                    position: 'absolute',
+                    left: `${pos.x}px`,
+                    top: `${pos.y}px`,
+                  }}
+                >
+                  <HexagonSlot
+                    slot={slot}
+                    index={index}
+                    type="hotbar"
+                    onClick={(e, idx, type) => handleSlotClick(e, idx, type)}
+                  />
+                </div>
+              );
+            })}
           </div>
         </div>
 

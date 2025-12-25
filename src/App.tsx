@@ -49,6 +49,7 @@ function App() {
   });
 
   const [inventoryOpen, setInventoryOpen] = useState(false);
+  const [spawnPosition, setSpawnPosition] = useState<{x: number, y: number, z: number} | null>(null);
 
   // Обработчики инвентаря
   const handleInventoryChange = (inventory: InventorySlot[]) => {
@@ -110,9 +111,14 @@ function App() {
         setGameState(state);
       }, settingsRef.current);
 
-      // Простое размещение игрока на фиксированной высоте
-      const spawnPos = hexToWorld(0, 0, 0);
-      gameRef.current.setPlayerPosition(spawnPos.x, 10, spawnPos.z);
+      // Размещаем игрока на рассчитанной высоте спавна или по умолчанию
+      if (spawnPosition) {
+        gameRef.current.setPlayerPosition(spawnPosition.x, spawnPosition.y, spawnPosition.z);
+      } else {
+        // Fallback на фиксированную позицию, если спавн не рассчитан
+        const spawnPos = hexToWorld(0, 0, 0);
+        gameRef.current.setPlayerPosition(spawnPos.x, 10, spawnPos.z);
+      }
 
       const handleKeyDown = (e: KeyboardEvent) => {
         if (e.code === 'Backquote') {
@@ -154,7 +160,7 @@ function App() {
         document.removeEventListener('keydown', handleKeyDown);
       };
     }
-  }, [currentScreen]);
+  }, [currentScreen, spawnPosition]);
 
   const handleNewGame = () => {
     setCurrentScreen('worldSetup');
@@ -198,11 +204,16 @@ function App() {
 
     // 5. Находим высоту спавна
     let spawnHeight: number | null = tempWorld.getHighestBlockAt(0, 0);
-    
+
     if (spawnHeight === null) {
       console.warn('[App] Чанк (0,0) не содержит блоков, используем высоту по умолчанию');
       spawnHeight = 10; // Высота по умолчанию
     }
+
+    // Сохраняем позицию спавна для использования при инициализации игры
+    const finalHeight = spawnHeight !== null ? spawnHeight + 1.7 : 11.7; // Высота игрока + отступ
+    const spawnPos = hexToWorld(0, 0, 0);
+    setSpawnPosition({ x: spawnPos.x, y: finalHeight, z: spawnPos.z });
 
     setLoadingProgress(85);
     setLoadingStatus('Размещение игрока...');

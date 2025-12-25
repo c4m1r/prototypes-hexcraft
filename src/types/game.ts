@@ -60,7 +60,7 @@ export interface InventorySlot {
 }
 
 export interface EquipmentSlot {
-  type: 'helmet' | 'chestplate' | 'leggings' | 'boots' | 'cape' | 'artifact1' | 'artifact2' | 'artifact3';
+  type: 'helmet' | 'chestplate' | 'leggings' | 'boots' | 'cape' | 'head' | 'chest' | 'legs' | 'cape_vanity' | 'amulet' | 'ring1' | 'ring2' | 'artifact1' | 'artifact2';
   item: Item | null;
   name: string;
 }
