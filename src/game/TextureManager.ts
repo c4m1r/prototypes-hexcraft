@@ -183,9 +183,21 @@ export class TextureManager {
     return { u, v, uSize, vSize };
   }
 
-  createMaterial(blockId: string, time: number = 0): THREE.MeshLambertMaterial | THREE.ShaderMaterial | null {
+  createMaterial(blockId: string, time: number = 0, fallbackColor?: string): THREE.MeshLambertMaterial | THREE.ShaderMaterial | null {
     const config = this.blockConfigs.get(blockId);
-    if (!config || !this.atlasTexture) return null;
+    // Если нет конфигурации или атласа, возвращаем fallback цветной материал
+    if (!config || !this.atlasTexture) {
+      if (fallbackColor) {
+        const isLeaves = blockId === 'leaves';
+        return new THREE.MeshLambertMaterial({
+          color: fallbackColor,
+          transparent: isLeaves || blockId === 'water' || blockId === 'lava',
+          opacity: isLeaves ? 0.75 : (blockId === 'water' ? 0.7 : (blockId === 'lava' ? 1 : 1)),
+          side: (isLeaves || blockId === 'water' || blockId === 'lava') ? THREE.DoubleSide : THREE.FrontSide
+        });
+      }
+      return null;
+    }
 
     let topTexture: THREE.Texture;
     let sideTexture: THREE.Texture;
@@ -210,15 +222,20 @@ export class TextureManager {
     const texturesDifferent = config.top.row !== config.side.row || config.top.col !== config.side.col;
     const useCustomShader = hasTopTexture && texturesDifferent;
 
+    // Включаем прозрачность только если она задана в конфиге или если текстура имеет альфа-канал
+    // Для leaves, water, lava всегда включаем прозрачность
+    const shouldBeTransparent = config.transparent || blockId === 'leaves' || blockId === 'water' || blockId === 'lava';
+    
     if (useCustomShader) {
-      return this.createDualTextureMaterial(topTexture, sideTexture, config);
+      return this.createDualTextureMaterial(topTexture, sideTexture, config, shouldBeTransparent);
     } else {
       // Если текстуры одинаковые или top не задан, используем side для всех граней
       const material = new THREE.MeshLambertMaterial({
         map: sideTexture,
-        transparent: config.transparent || false,
+        transparent: shouldBeTransparent,
         opacity: config.opacity !== undefined ? config.opacity : 1,
-        side: config.transparent ? THREE.DoubleSide : THREE.FrontSide
+        side: shouldBeTransparent ? THREE.DoubleSide : THREE.FrontSide,
+        alphaTest: shouldBeTransparent ? 0.1 : 0 // Используем альфа-канал из текстуры
       });
 
       (material as any).topTexture = sideTexture; // Используем side как fallback
@@ -231,7 +248,8 @@ export class TextureManager {
   private createDualTextureMaterial(
     topTexture: THREE.Texture,
     sideTexture: THREE.Texture,
-    config: BlockTextureConfig
+    config: BlockTextureConfig,
+    transparent: boolean = false
   ): THREE.ShaderMaterial {
     const vertexShader = `
       varying vec3 vWorldNormal;
@@ -272,7 +290,13 @@ export class TextureManager {
         vec3 lighting = ambientLightColor + directionalLightColor * NdotL;
         color.rgb *= lighting;
         
-        gl_FragColor = vec4(color.rgb, color.a * opacity);
+        // Используем альфа-канал из текстуры, умножаем на opacity только если нужно
+        float finalAlpha = color.a;
+        if (opacity < 1.0) {
+          finalAlpha = color.a * opacity;
+        }
+        
+        gl_FragColor = vec4(color.rgb, finalAlpha);
       }
     `;
 
@@ -287,8 +311,9 @@ export class TextureManager {
       },
       vertexShader,
       fragmentShader,
-      transparent: config.transparent || false,
-      side: config.transparent ? THREE.DoubleSide : THREE.FrontSide
+      transparent: transparent,
+      side: transparent ? THREE.DoubleSide : THREE.FrontSide,
+      alphaTest: transparent ? 0.1 : 0 // Используем альфа-канал из текстуры
     });
 
     return material;
@@ -302,6 +327,8 @@ export class TextureManager {
     const texture = this.atlasTexture.clone();
     texture.offset.set(uv.u, 1 - uv.v - uv.vSize);
     texture.repeat.set(uv.uSize, uv.vSize);
+    // Включаем использование альфа-канала из текстуры
+    texture.format = THREE.RGBAFormat;
     return texture;
   }
 

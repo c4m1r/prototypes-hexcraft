@@ -120,7 +120,9 @@ export class Game {
       (x, z) => this.world.getHeightAt(x, z),
       () => {
         didJump = true;
-      }
+      },
+      (x, y, z) => this.world.getBlockTypeAt(x, y, z),
+      (blockType) => this.world.getPassableSlowdown(blockType)
     );
 
     this.updateStamina(Math.min(deltaTime, 0.1), didJump);

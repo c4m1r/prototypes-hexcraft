@@ -79,7 +79,9 @@ export class PlayerController {
   update(
     deltaTime: number,
     getHeightAt: (x: number, z: number) => number,
-    onJump?: () => void
+    onJump?: () => void,
+    getBlockTypeAt?: (x: number, y: number, z: number) => string | null,
+    getPassableSlowdown?: (blockType: string) => number
   ): void {
     const sprintKey = this.keys['ShiftLeft'];
     this.isSprinting = false;
@@ -96,6 +98,16 @@ export class PlayerController {
       this.isSprinting = true;
       moveSpeed = this.speed * this.sprintMultiplier;
     }
+
+    // Проверяем проходимость блоков и применяем замедление
+    let slowdownMultiplier = 1.0;
+    if (getBlockTypeAt && getPassableSlowdown) {
+      const blockType = getBlockTypeAt(this.position.x, this.position.y, this.position.z);
+      if (blockType) {
+        slowdownMultiplier = getPassableSlowdown(blockType);
+      }
+    }
+    moveSpeed *= slowdownMultiplier;
 
     if (!this.isFlying && this.pendingJump && this.isGrounded) {
       this.velocity.y = this.jumpForce;
@@ -119,7 +131,15 @@ export class PlayerController {
       else if (this.keys['ShiftLeft']) this.velocity.y = -moveSpeed;
       else this.velocity.y *= 0.8;
     } else {
-      this.velocity.y -= this.gravity * deltaTime;
+      // Применяем замедление падения в проходимых блоках
+      let gravityMultiplier = 1.0;
+      if (getBlockTypeAt && getPassableSlowdown) {
+        const blockType = getBlockTypeAt(this.position.x, this.position.y, this.position.z);
+        if (blockType) {
+          gravityMultiplier = getPassableSlowdown(blockType);
+        }
+      }
+      this.velocity.y -= this.gravity * deltaTime * gravityMultiplier;
     }
 
     this.position.x += this.velocity.x * deltaTime;

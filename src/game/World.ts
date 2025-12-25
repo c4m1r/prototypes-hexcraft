@@ -87,19 +87,21 @@ export class World {
   private initializeMaterials(): void {
     BLOCK_TYPES.forEach(blockType => {
       if (this.renderingMode === 'modern' && this.textureManager) {
-        const material = this.textureManager.createMaterial(blockType.id, this.animationTime);
+        const material = this.textureManager.createMaterial(blockType.id, this.animationTime, blockType.color);
         if (material) {
           this.materials.set(blockType.id, material);
         } else {
-          // Fallback на цветной материал
+          // Fallback на цветной материал (если нет текстуры в атласе)
           const isLeaves = blockType.id === 'leaves';
+          const isWater = blockType.id === 'water';
+          const isLava = blockType.id === 'lava';
           this.materials.set(
             blockType.id,
             new THREE.MeshLambertMaterial({
               color: blockType.color,
-              transparent: isLeaves,
-              opacity: isLeaves ? 0.75 : 1,
-              side: isLeaves ? THREE.DoubleSide : THREE.FrontSide
+              transparent: isLeaves || isWater || isLava,
+              opacity: isLeaves ? 0.75 : (isWater ? 0.7 : (isLava ? 1 : 1)),
+              side: (isLeaves || isWater || isLava) ? THREE.DoubleSide : THREE.FrontSide
             })
           );
         }
@@ -334,9 +336,14 @@ export class World {
       const chunk = this.chunks.get(key);
 
       if (chunk) {
-        // Check height at this q,r
+        // Check height at this q,r, пропускаем проходимые блоки
         for (let y = 32; y >= 0; y--) {
           if (chunk.blockMap.has(`${q},${r},${y}`)) {
+            const block = chunk.blockMap.get(`${q},${r},${y}`)!;
+            // Пропускаем проходимые блоки (leaves, water, lava)
+            if (this.isPassable(block.type)) {
+              continue;
+            }
             const blockPos = hexToWorld(q, r, y);
             const dist = Math.sqrt(Math.pow(blockPos.x - x, 2) + Math.pow(blockPos.z - z, 2));
 
@@ -350,6 +357,30 @@ export class World {
     }
 
     return maxHeight;
+  }
+
+  getBlockTypeAt(x: number, y: number, z: number): string | null {
+    const hex = worldToHex(x, z);
+    const blockY = Math.floor(y);
+    return this.getBlockAt(hex.q, hex.r, blockY)?.type || null;
+  }
+
+  isPassable(blockType: string): boolean {
+    return blockType === 'leaves' || blockType === 'water' || blockType === 'lava';
+  }
+
+  getPassableSlowdown(blockType: string): number {
+    // Коэффициент замедления: 1.0 = нормальная скорость, меньше = медленнее
+    switch (blockType) {
+      case 'leaves':
+        return 0.7; // Замедление на 30%
+      case 'water':
+        return 0.5; // Замедление на 50%
+      case 'lava':
+        return 0.3; // Замедление на 70%
+      default:
+        return 1.0;
+    }
   }
 
   addBlock(block: Block): void {
