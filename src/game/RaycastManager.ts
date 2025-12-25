@@ -24,12 +24,13 @@ export class RaycastManager {
   }
 
   private createHighlightMesh(): void {
-    // Создаем геометрию Selection Outline точно такую же как у блоков
-    // Используем те же размеры и поворот на 30 градусов для pointy-top ориентации
-    const cylinderGeometry = new THREE.CylinderGeometry(HEX_RADIUS, HEX_RADIUS, HEX_HEIGHT, 6);
-    // Поворачиваем на 30 градусов вокруг оси Y для правильной ориентации pointy-top (как у блоков)
-    cylinderGeometry.rotateY(Math.PI / 6); // 30 градусов = π/6 радиан
-    const geometry = new THREE.EdgesGeometry(cylinderGeometry);
+    // Используем ту же геометрию что и у блоков, но как EdgesGeometry для outline
+    const baseGeometry = createHexGeometry();
+    // Увеличиваем размер на небольшой offset чтобы outline был чуть больше блока
+    const scale = 1.02; // 2% увеличение
+    baseGeometry.scale(scale, scale, scale);
+
+    const geometry = new THREE.EdgesGeometry(baseGeometry);
     const material = new THREE.LineBasicMaterial({ color: 0xffffff, linewidth: 2 });
     this.highlightMesh = new THREE.LineSegments(geometry, material);
     this.highlightMesh.visible = false;
