@@ -51,16 +51,25 @@ function App() {
       }, settingsRef.current);
 
       // Размещаем игрока на правильной высоте после создания игры
-      // Используем setTimeout, чтобы дать миру время инициализироваться
-      setTimeout(() => {
-        if (gameRef.current) {
+      // Используем setTimeout с несколькими попытками, чтобы дать миру время инициализироваться
+      let placementAttempts = 0;
+      const tryPlacePlayer = () => {
+        if (gameRef.current && placementAttempts < 20) {
           const spawnHeight = gameRef.current.getSpawnHeight(0, 0);
-          const spawnPos = hexToWorld(0, 0, 0);
-          const finalY = spawnHeight !== null ? spawnHeight + 1.7 : 10;
           
-          gameRef.current.setPlayerPosition(spawnPos.x, finalY, spawnPos.z);
+          if (spawnHeight !== null || placementAttempts >= 19) {
+            const spawnPos = hexToWorld(0, 0, 0);
+            const finalY = spawnHeight !== null ? spawnHeight + 1.7 : 10;
+            
+            gameRef.current.setPlayerPosition(spawnPos.x, finalY, spawnPos.z);
+          } else {
+            placementAttempts++;
+            setTimeout(tryPlacePlayer, 100);
+          }
         }
-      }, 200);
+      };
+      
+      setTimeout(tryPlacePlayer, 300);
 
       const handleKeyDown = (e: KeyboardEvent) => {
         if (e.code === 'Backquote') {
@@ -110,15 +119,22 @@ function App() {
     // Генерируем первый чанк (0, 0)
     tempWorld.initialize();
     
-    // Ждем немного, чтобы чанк успел загрузиться
-    await new Promise(resolve => setTimeout(resolve, 100));
+    // Ждем, чтобы чанк успел полностью загрузиться и сгенерироваться
+    let attempts = 0;
+    let spawnHeight: number | null = null;
+    while (attempts < 50 && spawnHeight === null) {
+      await new Promise(resolve => setTimeout(resolve, 50));
+      spawnHeight = tempWorld.getHighestBlockAt(0, 0);
+      attempts++;
+      
+      setLoadingProgress(20 + Math.min(40, attempts * 2));
+      setLoadingStatus(`Генерация первого биома... (${attempts}/50)`);
+    }
     
     setLoadingProgress(60);
     setLoadingStatus('Поиск точки спавна...');
 
     // Находим самую высокую точку в координатах q:0, r:0
-    const spawnHeight = tempWorld.getHighestBlockAt(0, 0);
-    
     if (spawnHeight === null) {
       // Если не нашли блок, используем высоту по умолчанию
       setLoadingProgress(80);
@@ -135,7 +151,7 @@ function App() {
     tempScene.clear();
 
     // Небольшая задержка для плавности
-    await new Promise(resolve => setTimeout(resolve, 200));
+    await new Promise(resolve => setTimeout(resolve, 300));
 
     setLoadingProgress(100);
     setShowHelpHint(true);

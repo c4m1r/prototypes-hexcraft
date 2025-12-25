@@ -1,10 +1,11 @@
 import * as THREE from 'three';
 
-// HEX_SIZE определяет расстояние между центрами соседних гексагонов
-// Для flat-top ориентации радиус гексагона = HEX_SIZE / sqrt(3)
+// HEX_SIZE - радиус гексагона для pointy-top ориентации
 export const HEX_SIZE = 1;
-export const HEX_HEIGHT = 2; // Увеличена высота блоков в 2 раза
-export const HEX_RADIUS = HEX_SIZE / Math.sqrt(3); // Радиус гексагона для правильного выравнивания
+export const HEX_HEIGHT = 2; // Высота блоков
+// Для pointy-top: hexWidth = √3 * size, hexHeight = 2 * size
+export const HEX_WIDTH = Math.sqrt(3) * HEX_SIZE; // Ширина гексагона
+export const HEX_RADIUS = HEX_SIZE; // Радиус = size для pointy-top
 
 export interface HexCoords {
   q: number;
@@ -13,18 +14,18 @@ export interface HexCoords {
 }
 
 export function hexToWorld(q: number, r: number, y: number = 0): THREE.Vector3 {
-  // Для flat-top ориентации: расстояние между центрами = sqrt(3) * радиус
-  // Если радиус = HEX_RADIUS, то расстояние = sqrt(3) * HEX_RADIUS = HEX_SIZE
-  // Формула должна использовать HEX_RADIUS для правильного масштабирования
-  const x = HEX_RADIUS * Math.sqrt(3) * (q + r / 2);
-  const z = HEX_RADIUS * (3 / 2) * r;
+  // Для pointy-top ориентации (остриями вверх):
+  // x = size * √3 * (q + r/2)
+  // z = size * 1.5 * r
+  const x = HEX_SIZE * Math.sqrt(3) * (q + r / 2);
+  const z = HEX_SIZE * 1.5 * r;
   return new THREE.Vector3(x, y * HEX_HEIGHT, z);
 }
 
 export function worldToHex(x: number, z: number): HexCoords {
-  // Обратная формула для flat-top ориентации
-  const q = (Math.sqrt(3) / 3 * x - 1 / 3 * z) / HEX_RADIUS;
-  const r = (2 / 3 * z) / HEX_RADIUS;
+  // Обратная формула для pointy-top ориентации
+  const q = (Math.sqrt(3) / 3 * x - 1 / 3 * z) / HEX_SIZE;
+  const r = (2 / 3 * z) / HEX_SIZE;
   return axialRound(q, r);
 }
 
@@ -50,9 +51,10 @@ export function axialRound(q: number, r: number): HexCoords {
 }
 
 export function createHexGeometry(): THREE.CylinderGeometry {
+  // Для pointy-top НЕ поворачиваем геометрию - она уже правильной ориентации
+  // Первая вершина должна быть сверху (0 градусов)
   const geometry = new THREE.CylinderGeometry(HEX_RADIUS, HEX_RADIUS, HEX_HEIGHT, 6);
-  // Поворачиваем геометрию на 30 градусов для правильной ориентации flat-top гексагонов
-  geometry.rotateY(Math.PI / 6);
+  // НЕ применяем rotation - геометрия уже правильной ориентации для pointy-top
   return geometry;
 }
 
@@ -63,11 +65,11 @@ export function createHexGeometryWithUV(): THREE.BufferGeometry {
   const uvs: number[] = [];
   const indices: number[] = [];
 
-  const radius = HEX_RADIUS; // Используем правильный радиус для выравнивания
+  const radius = HEX_RADIUS; // Радиус = size для pointy-top
   const height = HEX_HEIGHT;
   const segments = 6;
-  // Поворот на 30 градусов для правильной ориентации flat-top гексагонов
-  const rotationOffset = Math.PI / 6;
+  // Для pointy-top НЕ применяем rotation - первая вершина сверху (0 градусов)
+  const rotationOffset = 0;
 
   // Верхняя грань (верхняя текстура)
   const topCenterIndex = vertices.length / 3;

@@ -108,7 +108,25 @@ export class ChunkGenerator {
       }
     }
 
-    // Генерируем базовый ландшафт
+    // ШАГ 1: Генерируем базовый каменный слой до определенной глубины
+    const baseStoneDepth = 20; // Базовая глубина каменного слоя
+    for (let q = 0; q < this.chunkSize; q++) {
+      for (let r = 0; r < this.chunkSize; r++) {
+        const worldQ = offsetQ + q;
+        const worldR = offsetR + r;
+        const s = -worldQ - worldR;
+        
+        // Генерируем каменный слой от y=0 до y=baseStoneDepth
+        for (let y = 0; y <= baseStoneDepth && y < maxY; y++) {
+          blocks.push({
+            type: 'stone',
+            position: { q: worldQ, r: worldR, s, y }
+          });
+        }
+      }
+    }
+
+    // ШАГ 2: Генерируем поверхность биома поверх каменного слоя
     for (let q = 0; q < this.chunkSize; q++) {
       for (let r = 0; r < this.chunkSize; r++) {
         const worldQ = offsetQ + q;
@@ -117,30 +135,25 @@ export class ChunkGenerator {
         const biome = biomeMap.get(`${q},${r}`) || 'grassland';
         const biomeConfig = this.biomeConfigs.get(biome) || this.biomeConfigs.get('grassland')!;
 
-        // Высота поверхности детерминированная для биома (без шума)
+        // Высота поверхности детерминированная для биома
         const surfaceHeight = this.getSurfaceHeight(worldQ, worldR, biomeConfig);
         heightMap.set(`${q},${r}`, surfaceHeight);
 
-        // Генерируем колонку блоков
-        const columnBlocks = this.generateColumn(
-          worldQ,
-          worldR,
-          s,
-          surfaceHeight,
-          biomeConfig,
-          maxY
-        );
-        blocks.push(...columnBlocks);
+        // Генерируем поверхностные слои биома поверх камня
+        this.generateSurfaceLayers(blocks, worldQ, worldR, s, surfaceHeight, biomeConfig, baseStoneDepth);
       }
     }
 
-    // Генерируем озера/моря (до пещер, чтобы они могли соединять биомы)
+    // ШАГ 3: Генерируем пещеры под землей (удаляем блоки)
+    this.generateCaves(blocks, offsetQ, offsetR, maxY, baseStoneDepth, heightMap);
+
+    // ШАГ 4: Генерируем вулканы с лавой
+    this.generateVolcanoes(blocks, offsetQ, offsetR, heightMap, biomeMap, maxY, baseStoneDepth);
+
+    // ШАГ 5: Генерируем воду (озера/моря/реки) - после пещер и вулканов
     this.generateLakes(blocks, offsetQ, offsetR, heightMap, biomeMap, maxY);
 
-    // Генерируем пещеры (3D шум вычитание)
-    this.generateCaves(blocks, offsetQ, offsetR, maxY);
-
-    // Удаляем висящие блоки после генерации пещер
+    // ШАГ 6: Удаляем висящие блоки после всех модификаций
     this.removeFloatingBlocks(blocks, offsetQ, offsetR, maxY);
 
     // Генерируем структуры (с проверками наложения)
@@ -214,65 +227,78 @@ export class ChunkGenerator {
     return Math.floor(baseHeight + heightVariation * (Math.sin(q * 0.1) + Math.cos(r * 0.1)) * 0.5);
   }
 
-  private generateColumn(
+  private generateSurfaceLayers(
+    blocks: Block[],
     q: number,
     r: number,
     s: number,
     surfaceHeight: number,
     biomeConfig: BiomeConfig,
-    maxY: number
-  ): Block[] {
-    const blocks: Block[] = [];
+    baseStoneDepth: number
+  ): void {
+    const blockMap = new Map<string, Block>();
+    blocks.forEach(block => {
+      const key = `${block.position.q},${block.position.r},${block.position.y}`;
+      blockMap.set(key, block);
+    });
+
+    // Генерируем слои от поверхности вниз до базового каменного слоя
     let depth = 0;
+    const startY = Math.max(surfaceHeight, baseStoneDepth + 1);
+    const endY = baseStoneDepth + 1;
 
-    // Генерируем слои от поверхности вниз
-    // Гарантируем минимум 5 блоков, начиная с поверхности
-    const minBlocks = 5;
-    const startY = surfaceHeight;
-    const endY = Math.max(0, startY - minBlocks + 1);
+    for (let y = startY; y >= endY && y >= 0; y--) {
+      const blockKey = `${q},${r},${y}`;
+      
+      // Пропускаем если блок уже существует (из базового каменного слоя)
+      if (blockMap.has(blockKey)) {
+        // Заменяем камень на поверхностные слои биома
+        const existingBlock = blockMap.get(blockKey)!;
+        let blockType = 'stone';
 
-    for (let y = startY; y >= endY && y >= 0 && y < maxY; y--) {
-      let blockType = 'stone'; // По умолчанию камень
-
-      // Определяем тип блока на основе глубины и конфигурации биома
-      for (const layer of biomeConfig.subsurfaceLayers) {
-        if (depth < layer.depth) {
-          blockType = layer.block;
-          break;
+        // Определяем тип блока на основе глубины от поверхности
+        const depthFromSurface = surfaceHeight - y;
+        for (const layer of biomeConfig.subsurfaceLayers) {
+          if (depthFromSurface < layer.depth) {
+            blockType = layer.block;
+            break;
+          }
         }
-      }
 
-      // Поверхностный блок
-      if (y === surfaceHeight) {
-        blockType = biomeConfig.surfaceBlock;
-      }
+        // Поверхностный блок
+        if (y === surfaceHeight) {
+          blockType = biomeConfig.surfaceBlock;
+        }
 
-      blocks.push({
-        type: blockType,
-        position: { q, r, s, y }
-      });
+        // Обновляем тип блока
+        existingBlock.type = blockType;
+      } else {
+        // Добавляем новый блок поверх базового слоя
+        let blockType = 'stone';
+        const depthFromSurface = surfaceHeight - y;
+        
+        for (const layer of biomeConfig.subsurfaceLayers) {
+          if (depthFromSurface < layer.depth) {
+            blockType = layer.block;
+            break;
+          }
+        }
+
+        if (y === surfaceHeight) {
+          blockType = biomeConfig.surfaceBlock;
+        }
+
+        blocks.push({
+          type: blockType,
+          position: { q, r, s, y }
+        });
+      }
 
       depth++;
     }
-
-    // Гарантируем минимум 5 блоков в колонке, добавляя камень вниз если нужно
-    while (blocks.length < minBlocks) {
-      const lastBlock = blocks[blocks.length - 1];
-      const newY = lastBlock ? lastBlock.position.y - 1 : endY - 1;
-      if (newY >= 0 && newY < maxY) {
-        blocks.push({
-          type: 'stone',
-          position: { q, r, s, y: newY }
-        });
-      } else {
-        break;
-      }
-    }
-
-    return blocks;
   }
 
-  private generateCaves(blocks: Block[], offsetQ: number, offsetR: number, maxY: number): void {
+  private generateCaves(blocks: Block[], offsetQ: number, offsetR: number, maxY: number, baseStoneDepth: number, heightMap: Map<string, number>): void {
     const caveBlocks = new Set<string>();
     const blocksToRemove: Block[] = [];
     const blockMap = new Map<string, Block>();
@@ -284,12 +310,13 @@ export class ChunkGenerator {
     });
 
     // Генерируем большие пещерные камеры используя 3D шум
-    // Используем более низкую частоту для создания больших камер
+    // Пещеры только под землей, начиная с базового каменного слоя
     const caveRadius = 2.5; // Минимальный радиус камеры больше одного блока
+    const caveStartY = baseStoneDepth + 1; // Пещеры начинаются под поверхностью
     
     for (let q = -Math.ceil(caveRadius); q < this.chunkSize + Math.ceil(caveRadius); q++) {
       for (let r = -Math.ceil(caveRadius); r < this.chunkSize + Math.ceil(caveRadius); r++) {
-        for (let y = 3; y < maxY - 3; y++) {
+        for (let y = caveStartY; y < maxY - 3 && y > baseStoneDepth; y++) {
           const worldQ = offsetQ + q;
           const worldR = offsetR + r;
 
@@ -317,7 +344,7 @@ export class ChunkGenerator {
                   const checkKey = `${checkQ},${checkR},${checkY}`;
                   
                   // Проверяем, что блок существует и не на поверхности
-                  if (blockMap.has(checkKey) && checkY < maxY - 2 && checkY > 2) {
+                  if (blockMap.has(checkKey) && checkY < maxY - 2 && checkY > baseStoneDepth) {
                     const neighborNoise = this.caveNoise3D(checkQ * 0.05, checkR * 0.05, checkY * 0.06);
                     if (neighborNoise > caveThreshold - 0.1) {
                       caveBlocks.add(checkKey);
@@ -338,7 +365,8 @@ export class ChunkGenerator {
         const worldR = offsetR + r;
         
         // Проверяем наличие пещеры под поверхностью
-        for (let y = 3; y < 10; y++) {
+        const surfaceHeight = heightMap.get(`${q},${r}`) || baseStoneDepth + 5;
+        for (let y = caveStartY; y < surfaceHeight && y < maxY - 3; y++) {
           const caveKey = `${worldQ},${worldR},${y}`;
           if (caveBlocks.has(caveKey)) {
             // Создаем широкий вход на поверхности
@@ -404,7 +432,7 @@ export class ChunkGenerator {
                     const passageY = Math.floor(y + (dy * step / steps));
                     const passageKey = `${passageQ},${passageR},${passageY}`;
                     
-                    if (blockMap.has(passageKey) && passageY > 2 && passageY < maxY - 2) {
+                    if (blockMap.has(passageKey) && passageY > baseStoneDepth && passageY < maxY - 2) {
                       connectedCaves.add(passageKey);
                     }
                   }
@@ -477,6 +505,130 @@ export class ChunkGenerator {
         blockMap.delete(`${block.position.q},${block.position.r},${block.position.y}`);
       }
     });
+  }
+
+  private generateVolcanoes(
+    blocks: Block[],
+    offsetQ: number,
+    offsetR: number,
+    heightMap: Map<string, number>,
+    biomeMap: Map<string, string>,
+    maxY: number,
+    baseStoneDepth: number
+  ): void {
+    const blockMap = new Map<string, Block>();
+    blocks.forEach(block => {
+      const key = `${block.position.q},${block.position.r},${block.position.y}`;
+      blockMap.set(key, block);
+    });
+
+    // Генерируем вулканы используя шум
+    for (let q = 0; q < this.chunkSize; q++) {
+      for (let r = 0; r < this.chunkSize; r++) {
+        const worldQ = offsetQ + q;
+        const worldR = offsetR + r;
+        const biome = biomeMap.get(`${q},${r}`) || 'grassland';
+        
+        // Вулканы только в stone биомах
+        if (biome !== 'stone') {
+          continue;
+        }
+
+        const volcanoNoise = this.simpleNoise(worldQ * 0.02, worldR * 0.02);
+        
+        // Вулканы появляются редко
+        if (volcanoNoise > 0.92) {
+          const surfaceHeight = heightMap.get(`${q},${r}`) || baseStoneDepth + 10;
+          const volcanoHeight = surfaceHeight + 5 + Math.floor(this.simpleNoise(worldQ * 0.1, worldR * 0.1) * 8);
+          
+          // Создаем конус вулкана
+          const volcanoRadius = 3 + Math.floor(this.simpleNoise(worldQ * 0.15, worldR * 0.15) * 3);
+          
+          for (let dq = -volcanoRadius; dq <= volcanoRadius; dq++) {
+            for (let dr = -volcanoRadius; dr <= volcanoRadius; dr++) {
+              const dist = Math.sqrt(dq * dq + dr * dr);
+              if (dist <= volcanoRadius) {
+                const volcanoQ = worldQ + dq;
+                const volcanoR = worldR + dr;
+                const volcanoS = -volcanoQ - volcanoR;
+                
+                // Высота конуса уменьшается от центра
+                const heightFactor = 1 - (dist / volcanoRadius);
+                const localVolcanoHeight = Math.floor(surfaceHeight + volcanoHeight * heightFactor);
+                
+                // Проверяем, что позиция в пределах текущего чанка
+                const checkLocalQ = volcanoQ - offsetQ;
+                const checkLocalR = volcanoR - offsetR;
+                
+                if (checkLocalQ >= 0 && checkLocalQ < this.chunkSize &&
+                    checkLocalR >= 0 && checkLocalR < this.chunkSize) {
+                  
+                  // Создаем конус вулкана из камня
+                  for (let y = surfaceHeight; y <= localVolcanoHeight && y < maxY; y++) {
+                    const volcanoKey = `${volcanoQ},${volcanoR},${y}`;
+                    const existingBlock = blockMap.get(volcanoKey);
+                    
+                    if (!existingBlock) {
+                      blocks.push({
+                        type: 'stone',
+                        position: { q: volcanoQ, r: volcanoR, s: volcanoS, y }
+                      });
+                      blockMap.set(volcanoKey, { type: 'stone', position: { q: volcanoQ, r: volcanoR, s: volcanoS, y } });
+                    } else if (existingBlock.type !== 'lava') {
+                      // Заменяем на камень, если не лава
+                      existingBlock.type = 'stone';
+                    }
+                  }
+                  
+                  // Добавляем лаву на вершине вулкана
+                  if (dist < volcanoRadius * 0.3) {
+                    const lavaY = localVolcanoHeight;
+                    const lavaKey = `${volcanoQ},${volcanoR},${lavaY}`;
+                    const lavaBlock = blockMap.get(lavaKey);
+                    
+                    if (lavaBlock) {
+                      lavaBlock.type = 'lava';
+                    } else {
+                      blocks.push({
+                        type: 'lava',
+                        position: { q: volcanoQ, r: volcanoR, s: volcanoS, y: lavaY }
+                      });
+                      blockMap.set(lavaKey, { type: 'lava', position: { q: volcanoQ, r: volcanoR, s: volcanoS, y: lavaY } });
+                    }
+                  }
+                  
+                  // Лава течет вниз от вершины до базового каменного слоя
+                  if (dist < volcanoRadius * 0.5) {
+                    for (let lavaY = localVolcanoHeight - 1; lavaY >= baseStoneDepth && lavaY >= 0; lavaY--) {
+                      const lavaKey = `${volcanoQ},${volcanoR},${lavaY}`;
+                      const existingLavaBlock = blockMap.get(lavaKey);
+                      
+                      // Проверяем, есть ли блок снизу (лава не течет в пустоту)
+                      const belowKey = `${volcanoQ},${volcanoR},${lavaY - 1}`;
+                      const belowBlock = blockMap.get(belowKey);
+                      
+                      if (belowBlock || lavaY === baseStoneDepth) {
+                        if (!existingLavaBlock) {
+                          blocks.push({
+                            type: 'lava',
+                            position: { q: volcanoQ, r: volcanoR, s: volcanoS, y: lavaY }
+                          });
+                          blockMap.set(lavaKey, { type: 'lava', position: { q: volcanoQ, r: volcanoR, s: volcanoS, y: lavaY } });
+                        } else if (existingLavaBlock.type !== 'lava') {
+                          existingLavaBlock.type = 'lava';
+                        }
+                      } else {
+                        break; // Прекращаем поток лавы, если нет опоры
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
   }
 
   private generateLakes(
