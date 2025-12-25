@@ -44,6 +44,15 @@ export interface Item {
   infinite?: boolean; // для хоткеев
 }
 
+export interface DroppedItem {
+  id: string;
+  item: Item;
+  position: { x: number; y: number; z: number };
+  count: number;
+  velocity: { x: number; y: number; z: number };
+  pickupRadius: number;
+}
+
 export interface InventorySlot {
   item: Item | null;
   count: number;
@@ -58,15 +67,15 @@ export interface Player {
 
 export const ITEMS: Item[] = [
   // Блоки
-  { id: 'grass', name: 'Grass Block', type: 'block', stackSize: 64, maxStackSize: 64, rarity: 'common', color: '#4a7c3a' },
-  { id: 'dirt', name: 'Dirt Block', type: 'block', stackSize: 64, maxStackSize: 64, rarity: 'common', color: '#8b5a3c' },
-  { id: 'stone', name: 'Stone Block', type: 'block', stackSize: 64, maxStackSize: 64, rarity: 'common', color: '#7a7a7a' },
-  { id: 'sand', name: 'Sand Block', type: 'block', stackSize: 64, maxStackSize: 64, rarity: 'common', color: '#ddc689' },
-  { id: 'wood', name: 'Wood Block', type: 'block', stackSize: 64, maxStackSize: 64, rarity: 'common', color: '#6b4423' },
-  { id: 'leaves', name: 'Leaves Block', type: 'block', stackSize: 64, maxStackSize: 64, rarity: 'common', color: '#2d5016' },
-  { id: 'snow', name: 'Snow Block', type: 'block', stackSize: 64, maxStackSize: 64, rarity: 'common', color: '#e8f2f7' },
-  { id: 'ice', name: 'Ice Block', type: 'block', stackSize: 64, maxStackSize: 64, rarity: 'common', color: '#b8d8e8' },
-  { id: 'lava', name: 'Lava Block', type: 'block', stackSize: 64, maxStackSize: 64, rarity: 'common', color: '#ff4500' },
+  { id: 'grass', name: 'Grass Block', type: 'block', stackSize: 72, maxStackSize: 72, rarity: 'common', color: '#4a7c3a' },
+  { id: 'dirt', name: 'Dirt Block', type: 'block', stackSize: 72, maxStackSize: 72, rarity: 'common', color: '#8b5a3c' },
+  { id: 'stone', name: 'Stone Block', type: 'block', stackSize: 72, maxStackSize: 72, rarity: 'common', color: '#7a7a7a' },
+  { id: 'sand', name: 'Sand Block', type: 'block', stackSize: 72, maxStackSize: 72, rarity: 'common', color: '#ddc689' },
+  { id: 'wood', name: 'Wood Block', type: 'block', stackSize: 72, maxStackSize: 72, rarity: 'common', color: '#6b4423' },
+  { id: 'leaves', name: 'Leaves Block', type: 'block', stackSize: 72, maxStackSize: 72, rarity: 'common', color: '#2d5016' },
+  { id: 'snow', name: 'Snow Block', type: 'block', stackSize: 72, maxStackSize: 72, rarity: 'common', color: '#e8f2f7' },
+  { id: 'ice', name: 'Ice Block', type: 'block', stackSize: 72, maxStackSize: 72, rarity: 'common', color: '#b8d8e8' },
+  { id: 'lava', name: 'Lava Block', type: 'block', stackSize: 72, maxStackSize: 72, rarity: 'common', color: '#ff4500' },
 
   // Руда
   { id: 'bronze', name: 'Bronze Ore', type: 'material', stackSize: 64, maxStackSize: 64, rarity: 'uncommon', color: '#cd7f32' },

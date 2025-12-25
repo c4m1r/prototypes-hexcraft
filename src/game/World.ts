@@ -603,7 +603,7 @@ export class World {
     }
   }
 
-  removeBlock(q: number, r: number, y: number): void {
+  removeBlock(q: number, r: number, y: number): Block | null {
     const worldPos = hexToWorld(q, r, 0);
     const chunkPos = worldToChunk(worldPos.x, worldPos.z, this.chunkSize);
     const key = getChunkKey(chunkPos.q, chunkPos.r);
@@ -622,8 +622,11 @@ export class World {
         // Recreate meshes
         this.removeChunkMeshes(key);
         this.createChunkMeshes(chunk);
+
+        return block;
       }
     }
+    return null;
   }
 
   getBlockAt(q: number, r: number, y: number): Block | null {

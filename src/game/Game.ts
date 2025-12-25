@@ -4,7 +4,7 @@ import { PlayerController } from './PlayerController';
 import { RaycastManager } from './RaycastManager';
 import { DayNightCycle } from './DayNightCycle';
 import { GameSettings } from '../types/settings';
-import { InventorySlot } from '../types/game';
+import { InventorySlot, DroppedItem, ITEMS } from '../types/game';
 
 export interface GameState {
   playerPosition: { x: number; y: number; z: number };
@@ -22,6 +22,7 @@ export interface GameState {
     inventory: InventorySlot[];
     hotbar: InventorySlot[];
   };
+  droppedItems: DroppedItem[];
 }
 
 export class Game {
@@ -51,6 +52,9 @@ export class Game {
   private playerInventory: InventorySlot[] = [];
   private playerHotbar: InventorySlot[] = [];
   private playerName: string = 'Player';
+  private droppedItems: DroppedItem[] = [];
+  private nextItemId: number = 0;
+  private droppedItemMeshes: Map<string, THREE.Mesh> = new Map();
 
   private initializeInventory() {
     const INVENTORY_SIZE = 27;
@@ -80,8 +84,8 @@ export class Game {
     });
 
     // Добавим несколько тестовых предметов в инвентарь
-    this.playerInventory[0] = { item: { id: 'stone', name: 'Stone Block', type: 'block', stackSize: 64, maxStackSize: 64, rarity: 'common', color: '#7a7a7a' }, count: 64 };
-    this.playerInventory[1] = { item: { id: 'wood', name: 'Wood Block', type: 'block', stackSize: 32, maxStackSize: 64, rarity: 'common', color: '#6b4423' }, count: 32 };
+    this.playerInventory[0] = { item: { id: 'stone', name: 'Stone Block', type: 'block', stackSize: 72, maxStackSize: 72, rarity: 'common', color: '#7a7a7a' }, count: 72 };
+    this.playerInventory[1] = { item: { id: 'wood', name: 'Wood Block', type: 'block', stackSize: 40, maxStackSize: 72, rarity: 'common', color: '#6b4423' }, count: 40 };
     this.playerInventory[2] = { item: { id: 'bronze', name: 'Bronze Ore', type: 'material', stackSize: 16, maxStackSize: 64, rarity: 'uncommon', color: '#cd7f32' }, count: 16 };
   }
 
@@ -147,18 +151,44 @@ export class Game {
       if (document.pointerLockElement !== document.body) return;
 
       if (e.button === 0) {
-        this.raycastManager.removeBlock(this.camera);
+        // Разрушение блока - создаем dropped item
+        const removedBlock = this.raycastManager.removeBlock(this.camera);
+        if (removedBlock) {
+          this.createDroppedItem(removedBlock);
+        }
       } else if (e.button === 2) {
+        // Размещение блока - уменьшаем количество в инвентаре
         const selectedSlot = this.player.getSelectedSlot();
         const selectedItem = this.playerHotbar[selectedSlot]?.item;
         if (selectedItem && selectedItem.type === 'block') {
-          this.raycastManager.placeBlock(this.camera, selectedItem.id);
+          // Проверяем есть ли предмет в инвентаре
+          if (this.playerHotbar[selectedSlot].count > 0) {
+            // Размещаем блок
+            const placed = this.raycastManager.placeBlock(this.camera, selectedItem.id);
+            if (placed) {
+              // Уменьшаем количество
+              this.playerHotbar[selectedSlot].count--;
+              // Если количество стало 0 - удаляем предмет
+              if (this.playerHotbar[selectedSlot].count === 0) {
+                this.playerHotbar[selectedSlot].item = null;
+              }
+            }
+          }
         }
       }
     });
 
     document.addEventListener('contextmenu', (e) => {
       e.preventDefault();
+    });
+
+    document.addEventListener('keydown', (e) => {
+      if (document.pointerLockElement !== document.body) return;
+
+      if (e.key.toLowerCase() === 'e') {
+        // Подбор предметов
+        this.pickupNearbyItems();
+      }
     });
 
     document.addEventListener('keydown', (e) => {
@@ -254,9 +284,13 @@ export class Game {
           name: this.playerName,
           inventory: this.playerInventory,
           hotbar: this.playerHotbar
-        }
+        },
+        droppedItems: this.droppedItems
       });
     }
+
+    // Обновляем dropped items (физика, гравитация)
+    this.updateDroppedItems(Math.min(deltaTime, 0.1));
 
     this.renderer.render(this.scene, this.camera);
   }
@@ -267,6 +301,171 @@ export class Game {
 
   updateHotbar(hotbar: InventorySlot[]) {
     this.playerHotbar = hotbar;
+  }
+
+  private createDroppedItem(block: Block): void {
+    // Находим позицию центра блока
+    const blockPos = hexToWorld(block.position.q, block.position.r, block.position.y);
+    const centerY = blockPos.y + HEX_HEIGHT / 2; // Центр блока по высоте
+
+    // Создаем dropped item
+    const item = ITEMS.find(item => item.id === block.type);
+    if (!item) return;
+
+    const droppedItem: DroppedItem = {
+      id: `item_${this.nextItemId++}`,
+      item: item,
+      position: {
+        x: blockPos.x,
+        y: centerY,
+        z: blockPos.z
+      },
+      count: 1,
+      velocity: {
+        x: (Math.random() - 0.5) * 2, // Случайное направление
+        y: Math.random() * 2 + 1, // Вверх
+        z: (Math.random() - 0.5) * 2
+      },
+      pickupRadius: 2.0
+    };
+
+    this.droppedItems.push(droppedItem);
+
+    // Создаем визуализацию
+    this.createDroppedItemMesh(droppedItem);
+  }
+
+  private createDroppedItemMesh(item: DroppedItem): void {
+    const geometry = new THREE.BoxGeometry(0.3, 0.3, 0.3);
+    const material = new THREE.MeshLambertMaterial({
+      color: item.item.color || 0x666666,
+      transparent: true,
+      opacity: 0.8
+    });
+
+    const mesh = new THREE.Mesh(geometry, material);
+    mesh.position.set(item.position.x, item.position.y + 0.15, item.position.z);
+    mesh.userData = { itemId: item.id };
+
+    this.scene.add(mesh);
+    this.droppedItemMeshes.set(item.id, mesh);
+  }
+
+  private removeDroppedItemMesh(itemId: string): void {
+    const mesh = this.droppedItemMeshes.get(itemId);
+    if (mesh) {
+      this.scene.remove(mesh);
+      this.droppedItemMeshes.delete(itemId);
+    }
+  }
+
+  private pickupNearbyItems(): void {
+    const playerPos = this.player.position;
+
+    // Собираем предметы в радиусе подбора
+    for (let i = this.droppedItems.length - 1; i >= 0; i--) {
+      const item = this.droppedItems[i];
+      const distance = Math.sqrt(
+        Math.pow(item.position.x - playerPos.x, 2) +
+        Math.pow(item.position.y - playerPos.y, 2) +
+        Math.pow(item.position.z - playerPos.z, 2)
+      );
+
+      if (distance <= item.pickupRadius) {
+        // Пытаемся добавить предмет в инвентарь
+        if (this.addItemToInventory(item.item, item.count)) {
+          // Удаляем визуализацию и предмет из мира
+          this.removeDroppedItemMesh(item.id);
+          this.droppedItems.splice(i, 1);
+        }
+      }
+    }
+  }
+
+  private addItemToInventory(item: Item, count: number): boolean {
+    // Сначала проверяем инвентарь
+    for (let i = 0; i < this.playerInventory.length; i++) {
+      const slot = this.playerInventory[i];
+      if (slot.item && slot.item.id === item.id && slot.count < slot.item.maxStackSize) {
+        const space = slot.item.maxStackSize - slot.count;
+        const toAdd = Math.min(count, space);
+        slot.count += toAdd;
+        count -= toAdd;
+        if (count === 0) return true;
+      }
+    }
+
+    // Ищем пустой слот в инвентаре
+    for (let i = 0; i < this.playerInventory.length; i++) {
+      if (!this.playerInventory[i].item) {
+        this.playerInventory[i] = { item: item, count: Math.min(count, item.maxStackSize) };
+        count -= Math.min(count, item.maxStackSize);
+        if (count === 0) return true;
+      }
+    }
+
+    // Проверяем хотбар (только не infinite предметы)
+    if (!item.infinite) {
+      for (let i = 0; i < this.playerHotbar.length; i++) {
+        const slot = this.playerHotbar[i];
+        if (slot.item && slot.item.id === item.id && slot.count < slot.item.maxStackSize && !slot.item.infinite) {
+          const space = slot.item.maxStackSize - slot.count;
+          const toAdd = Math.min(count, space);
+          slot.count += toAdd;
+          count -= toAdd;
+          if (count === 0) return true;
+        }
+      }
+
+      // Ищем пустой слот в хотбаре
+      for (let i = 0; i < this.playerHotbar.length; i++) {
+        if (!this.playerHotbar[i].item) {
+          this.playerHotbar[i] = { item: item, count: Math.min(count, item.maxStackSize) };
+          count -= Math.min(count, item.maxStackSize);
+          if (count === 0) return true;
+        }
+      }
+    }
+
+    return count === 0;
+  }
+
+  private updateDroppedItems(deltaTime: number): void {
+    const GRAVITY = -9.81;
+    const FRICTION = 0.95;
+
+    for (let i = this.droppedItems.length - 1; i >= 0; i--) {
+      const item = this.droppedItems[i];
+
+      // Применяем гравитацию
+      item.velocity.y += GRAVITY * deltaTime;
+
+      // Обновляем позицию
+      item.position.x += item.velocity.x * deltaTime;
+      item.position.y += item.velocity.y * deltaTime;
+      item.position.z += item.velocity.z * deltaTime;
+
+      // Проверяем столкновение с землей
+      if (item.position.y <= 0) {
+        item.position.y = 0;
+        item.velocity.y = 0;
+        item.velocity.x *= FRICTION;
+        item.velocity.z *= FRICTION;
+
+        // Если скорость очень маленькая - останавливаем
+        if (Math.abs(item.velocity.x) < 0.01 && Math.abs(item.velocity.z) < 0.01) {
+          item.velocity.x = 0;
+          item.velocity.z = 0;
+        }
+      }
+
+      // Обновляем позицию меша
+      const mesh = this.droppedItemMeshes.get(item.id);
+      if (mesh) {
+        mesh.position.set(item.position.x, item.position.y + 0.15, item.position.z);
+        mesh.rotation.y += deltaTime * 2; // Вращение предмета
+      }
+    }
   }
 
   private updateStamina(deltaTime: number, didJump: boolean): void {

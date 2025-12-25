@@ -83,9 +83,9 @@ export class RaycastManager {
     return null;
   }
 
-  placeBlock(camera: THREE.Camera, blockType: string): void {
+  placeBlock(camera: THREE.Camera, blockType: string): boolean {
     const result = this.raycast(camera);
-    if (!result) return;
+    if (!result) return false;
 
     const normal = result.normal.clone();
     normal.applyQuaternion(
@@ -110,14 +110,16 @@ export class RaycastManager {
         position: { q: hexCoords.q, r: hexCoords.r, s: hexCoords.s, y }
       };
       this.world.addBlock(newBlock);
+      return true;
     }
+    return false;
   }
 
-  removeBlock(camera: THREE.Camera): void {
+  removeBlock(camera: THREE.Camera): Block | null {
     const result = this.raycast(camera);
-    if (!result) return;
+    if (!result) return null;
 
-    this.world.removeBlock(
+    return this.world.removeBlock(
       result.block.position.q,
       result.block.position.r,
       result.block.position.y

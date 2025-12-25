@@ -42,7 +42,8 @@ function App() {
       name: 'Player',
       inventory: [],
       hotbar: []
-    }
+    },
+    droppedItems: []
   });
 
   const [inventoryOpen, setInventoryOpen] = useState(false);

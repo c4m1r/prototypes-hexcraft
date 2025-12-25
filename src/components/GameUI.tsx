@@ -175,7 +175,9 @@ export function GameUI({
           <div>Shift - Down (Fly)</div>
           <div>Left Click - Break Block</div>
           <div>Right Click - Place Block</div>
+          <div>E - Pickup Items</div>
           <div>1-9,0 - Select Block</div>
+          <div>TAB - Inventory</div>
           <div>~ - Toggle Debug</div>
           <div>F - Toggle Fog Barrier</div>
           <div>ESC - Menu</div>
