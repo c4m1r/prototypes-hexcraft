@@ -97,64 +97,56 @@ export class ChunkGenerator {
     const heightMap = new Map<string, number>();
     const biomeMap = new Map<string, string>();
     const maxY = 32; // Максимальная глубина генерации
+    const baseStoneDepth = 20; // Базовая глубина каменного слоя
 
-    // Сначала определяем биомы для всех позиций
+    // ШАГ 1: Определяем биомы и высоты поверхности для всех позиций
     for (let q = 0; q < this.chunkSize; q++) {
       for (let r = 0; r < this.chunkSize; r++) {
         const worldQ = offsetQ + q;
         const worldR = offsetR + r;
         const biome = this.selectBiomeRegion(worldQ, worldR);
         biomeMap.set(`${q},${r}`, biome);
+        
+        const biomeConfig = this.biomeConfigs.get(biome) || this.biomeConfigs.get('grassland')!;
+        const surfaceHeight = this.getSurfaceHeight(worldQ, worldR, biomeConfig);
+        heightMap.set(`${q},${r}`, surfaceHeight);
       }
     }
 
-    // ШАГ 1: Генерируем базовый каменный слой до определенной глубины
-    const baseStoneDepth = 20; // Базовая глубина каменного слоя
+    // ШАГ 2: Заполняем весь объем чанка грязью (базовый материал)
+    const maxSurfaceHeight = Math.max(...Array.from(heightMap.values()));
+    const fillHeight = Math.max(maxSurfaceHeight + 5, baseStoneDepth + 5);
+    
     for (let q = 0; q < this.chunkSize; q++) {
       for (let r = 0; r < this.chunkSize; r++) {
         const worldQ = offsetQ + q;
         const worldR = offsetR + r;
         const s = -worldQ - worldR;
         
-        // Генерируем каменный слой от y=0 до y=baseStoneDepth
-        for (let y = 0; y <= baseStoneDepth && y < maxY; y++) {
+        // Заполняем грязью от y=0 до fillHeight
+        for (let y = 0; y <= fillHeight && y < maxY; y++) {
           blocks.push({
-            type: 'stone',
+            type: 'dirt',
             position: { q: worldQ, r: worldR, s, y }
           });
         }
       }
     }
 
-    // ШАГ 2: Генерируем поверхность биома поверх каменного слоя
-    for (let q = 0; q < this.chunkSize; q++) {
-      for (let r = 0; r < this.chunkSize; r++) {
-        const worldQ = offsetQ + q;
-        const worldR = offsetR + r;
-        const s = -worldQ - worldR;
-        const biome = biomeMap.get(`${q},${r}`) || 'grassland';
-        const biomeConfig = this.biomeConfigs.get(biome) || this.biomeConfigs.get('grassland')!;
+    // ШАГ 3: Заменяем блоки на основе шума и биомов
+    this.applyBiomeLayers(blocks, offsetQ, offsetR, heightMap, biomeMap, maxY, baseStoneDepth);
 
-        // Высота поверхности детерминированная для биома
-        const surfaceHeight = this.getSurfaceHeight(worldQ, worldR, biomeConfig);
-        heightMap.set(`${q},${r}`, surfaceHeight);
-
-        // Генерируем поверхностные слои биома поверх камня
-        this.generateSurfaceLayers(blocks, worldQ, worldR, s, surfaceHeight, biomeConfig, baseStoneDepth);
-      }
-    }
-
-    // ШАГ 3: Генерируем пещеры под землей (удаляем блоки)
+    // ШАГ 4: Генерируем пещеры под землей (заменяем грязь на воздух/удаляем блоки)
     this.generateCaves(blocks, offsetQ, offsetR, maxY, baseStoneDepth, heightMap);
 
-    // ШАГ 4: Генерируем вулканы с лавой
+    // ШАГ 5: Генерируем вулканы с лавой
     this.generateVolcanoes(blocks, offsetQ, offsetR, heightMap, biomeMap, maxY, baseStoneDepth);
 
-    // ШАГ 5: Генерируем воду (озера/моря/реки) - после пещер и вулканов
+    // ШАГ 6: Генерируем воду (озера/моря/реки) - после пещер и вулканов
     this.generateLakes(blocks, offsetQ, offsetR, heightMap, biomeMap, maxY);
 
-    // ШАГ 6: Удаляем висящие блоки после всех модификаций
-    this.removeFloatingBlocks(blocks, offsetQ, offsetR, maxY);
+    // ШАГ 7: Удаляем висящие блоки после всех модификаций
+    this.removeFloatingBlocks(blocks);
 
     // Генерируем структуры (с проверками наложения)
     const structureMap = new Set<string>(); // Карта занятых позиций структур
@@ -227,74 +219,65 @@ export class ChunkGenerator {
     return Math.floor(baseHeight + heightVariation * (Math.sin(q * 0.1) + Math.cos(r * 0.1)) * 0.5);
   }
 
-  private generateSurfaceLayers(
+  private applyBiomeLayers(
     blocks: Block[],
-    q: number,
-    r: number,
-    s: number,
-    surfaceHeight: number,
-    biomeConfig: BiomeConfig,
+    offsetQ: number,
+    offsetR: number,
+    heightMap: Map<string, number>,
+    biomeMap: Map<string, string>,
+    maxY: number,
     baseStoneDepth: number
   ): void {
+    // Создаем карту блоков для быстрого доступа
     const blockMap = new Map<string, Block>();
     blocks.forEach(block => {
       const key = `${block.position.q},${block.position.r},${block.position.y}`;
       blockMap.set(key, block);
     });
 
-    // Генерируем слои от поверхности вниз до базового каменного слоя
-    let depth = 0;
-    const startY = Math.max(surfaceHeight, baseStoneDepth + 1);
-    const endY = baseStoneDepth + 1;
+    // Проходим по всем позициям и заменяем грязь на нужные типы блоков
+    for (let q = 0; q < this.chunkSize; q++) {
+      for (let r = 0; r < this.chunkSize; r++) {
+        const worldQ = offsetQ + q;
+        const worldR = offsetR + r;
+        const biome = biomeMap.get(`${q},${r}`) || 'grassland';
+        const biomeConfig = this.biomeConfigs.get(biome) || this.biomeConfigs.get('grassland')!;
+        const surfaceHeight = heightMap.get(`${q},${r}`) || baseStoneDepth + 5;
 
-    for (let y = startY; y >= endY && y >= 0; y--) {
-      const blockKey = `${q},${r},${y}`;
-      
-      // Пропускаем если блок уже существует (из базового каменного слоя)
-      if (blockMap.has(blockKey)) {
-        // Заменяем камень на поверхностные слои биома
-        const existingBlock = blockMap.get(blockKey)!;
-        let blockType = 'stone';
+        // Заменяем блоки от поверхности вниз
+        for (let y = surfaceHeight; y >= 0 && y < maxY; y--) {
+          const blockKey = `${worldQ},${worldR},${y}`;
+          const block = blockMap.get(blockKey);
+          
+          if (!block) continue;
 
-        // Определяем тип блока на основе глубины от поверхности
-        const depthFromSurface = surfaceHeight - y;
-        for (const layer of biomeConfig.subsurfaceLayers) {
-          if (depthFromSurface < layer.depth) {
-            blockType = layer.block;
-            break;
+          let blockType = 'dirt'; // По умолчанию остается грязью
+
+          // Базовый каменный слой (y <= baseStoneDepth)
+          if (y <= baseStoneDepth) {
+            blockType = 'stone';
+          } else {
+            // Поверхностные слои биома
+            const depthFromSurface = surfaceHeight - y;
+            
+            // Поверхностный блок
+            if (y === surfaceHeight) {
+              blockType = biomeConfig.surfaceBlock;
+            } else {
+              // Определяем тип блока на основе глубины от поверхности
+              for (const layer of biomeConfig.subsurfaceLayers) {
+                if (depthFromSurface < layer.depth) {
+                  blockType = layer.block;
+                  break;
+                }
+              }
+            }
           }
-        }
 
-        // Поверхностный блок
-        if (y === surfaceHeight) {
-          blockType = biomeConfig.surfaceBlock;
+          // Заменяем тип блока
+          block.type = blockType;
         }
-
-        // Обновляем тип блока
-        existingBlock.type = blockType;
-      } else {
-        // Добавляем новый блок поверх базового слоя
-        let blockType = 'stone';
-        const depthFromSurface = surfaceHeight - y;
-        
-        for (const layer of biomeConfig.subsurfaceLayers) {
-          if (depthFromSurface < layer.depth) {
-            blockType = layer.block;
-            break;
-          }
-        }
-
-        if (y === surfaceHeight) {
-          blockType = biomeConfig.surfaceBlock;
-        }
-
-        blocks.push({
-          type: blockType,
-          position: { q, r, s, y }
-        });
       }
-
-      depth++;
     }
   }
 
@@ -460,7 +443,7 @@ export class ChunkGenerator {
     });
   }
 
-  private removeFloatingBlocks(blocks: Block[], offsetQ: number, offsetR: number, maxY: number): void {
+  private removeFloatingBlocks(blocks: Block[]): void {
     const blockMap = new Map<string, Block>();
     blocks.forEach(block => {
       const key = `${block.position.q},${block.position.r},${block.position.y}`;
