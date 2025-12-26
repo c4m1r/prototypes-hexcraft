@@ -52,6 +52,52 @@ export const GameUI = React.memo(function GameUI({
   const { t } = useLanguage();
   const [helpVisible, setHelpVisible] = useState(showHelpHint);
 
+  // Функция для разбиения текста на строки по 30 символов
+  const wrapText = (text: string, maxLength: number = 30): string[] => {
+    const words = text.split(' ');
+    const lines: string[] = [];
+    let currentLine = '';
+
+    words.forEach(word => {
+      if ((currentLine + word).length <= maxLength) {
+        currentLine += (currentLine ? ' ' : '') + word;
+      } else {
+        if (currentLine) {
+          lines.push(currentLine);
+        }
+        currentLine = word;
+      }
+    });
+
+    if (currentLine) {
+      lines.push(currentLine);
+    }
+
+    return lines;
+  };
+
+  // Подсказки для двух столбцов
+  const hints = [
+    t.gameUI.move,
+    t.gameUI.toggleFlyWalk,
+    t.gameUI.jumpWalk,
+    t.gameUI.downFly,
+    t.gameUI.breakBlock,
+    t.gameUI.placeBlock,
+    t.gameUI.pickupItems,
+    t.gameUI.selectBlock,
+    t.gameUI.inventory,
+    t.gameUI.toggleRenderingMode,
+    t.gameUI.toggleDebug,
+    t.gameUI.toggleFogBarrier,
+    t.gameUI.closeMenu
+  ];
+
+  // Разбиваем подсказки на два столбца
+  const midPoint = Math.ceil(hints.length / 2);
+  const leftColumn = hints.slice(0, midPoint);
+  const rightColumn = hints.slice(midPoint);
+
   useEffect(() => {
     if (showHelpHint) {
       setHelpVisible(true);
@@ -169,7 +215,7 @@ export const GameUI = React.memo(function GameUI({
       />
 
       {showDebug ? (
-        <div className="fixed left-8 top-8 bg-black/70 text-white px-4 py-3 rounded-lg text-xs space-y-2 pointer-events-none border border-white/30 font-mono">
+        <div className="fixed left-8 top-8 bg-black/70 text-white px-4 py-3 rounded-lg text-xs space-y-2 pointer-events-none border border-white/30 font-mono max-w-4xl">
           <div className="font-bold text-white border-b border-white/30 pb-2">
             {t.gameUI.time}: {currentTime}
           </div>
@@ -204,25 +250,33 @@ export const GameUI = React.memo(function GameUI({
             F: Effects {showFogBarrier ? t.gameUI.fogOn : t.gameUI.fogOff}
           </div>
 
-          <div className="pt-2 border-t border-white/30 text-xs">
-            ~ - {t.gameUI.toggleDebug} | ESC - {t.gameUI.closeMenu}
+          <div className="pt-2 border-t border-white/30">
+            <div className="font-semibold mb-2">{t.gameUI.debug} - {t.gameUI.helpHint}</div>
+            <div className="grid grid-cols-2 gap-x-4 gap-y-1">
+              <div className="space-y-1">
+                {leftColumn.map((hint, index) => (
+                  <div key={index} className="text-xs">
+                    {wrapText(hint, 30).map((line, lineIndex) => (
+                      <div key={lineIndex}>{line}</div>
+                    ))}
+                  </div>
+                ))}
+              </div>
+              <div className="space-y-1">
+                {rightColumn.map((hint, index) => (
+                  <div key={index + midPoint} className="text-xs">
+                    {wrapText(hint, 30).map((line, lineIndex) => (
+                      <div key={lineIndex}>{line}</div>
+                    ))}
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
         </div>
       ) : (
-        <div className="fixed top-8 left-8 bg-black/70 text-white px-4 py-2 rounded-lg text-sm space-y-1 pointer-events-none border border-white/30">
-          <div>{t.gameUI.move}</div>
-          <div>{t.gameUI.toggleFlyWalk}</div>
-          <div>{t.gameUI.jumpWalk}</div>
-          <div>{t.gameUI.downFly}</div>
-          <div>{t.gameUI.breakBlock}</div>
-          <div>{t.gameUI.placeBlock}</div>
-          <div>{t.gameUI.pickupItems}</div>
-          <div>{t.gameUI.selectBlock}</div>
-          <div>{t.gameUI.inventory}</div>
-          <div>{t.gameUI.toggleRenderingMode}</div>
-          <div>{t.gameUI.toggleDebug}</div>
-          <div>{t.gameUI.toggleFogBarrier}</div>
-          <div>{t.gameUI.closeMenu}</div>
+        <div className="fixed top-8 left-8 bg-black/70 text-white px-4 py-2 rounded-lg text-sm pointer-events-none border border-white/30">
+          {t.gameUI.pressForHints}
         </div>
       )}
     </>

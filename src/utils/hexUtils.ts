@@ -1,10 +1,12 @@
 import * as THREE from 'three';
 
-// HEX_SIZE - радиус гексагона для pointy-top ориентации
+// HEX_SIZE - базовая единица размера для pointy-top ориентации
 export const HEX_SIZE = 1;
 export const HEX_WIDTH = Math.sqrt(3) * HEX_SIZE; // Ширина гексагона = √3 * size
 export const HEX_HEIGHT = HEX_WIDTH; // Высота = ширине для квадратного вида
-export const HEX_RADIUS = HEX_SIZE; // Радиус = size для pointy-top
+// Радиус описанной окружности гексагона должен быть равен половине расстояния между центрами
+// Расстояние между центрами = sqrt(3) * HEX_SIZE, поэтому радиус = sqrt(3) / 2 * HEX_SIZE
+export const HEX_RADIUS = (Math.sqrt(3) / 2) * HEX_SIZE; // Радиус для правильного соприкосновения гранями
 
 export interface HexCoords {
   q: number;
@@ -62,7 +64,7 @@ export function createHexGeometryWithUV(): THREE.BufferGeometry {
   const uvs: number[] = [];
   const indices: number[] = [];
 
-  const radius = HEX_RADIUS; // Радиус = size для pointy-top
+  const radius = HEX_RADIUS; // Радиус для правильного соприкосновения гранями
   const height = HEX_HEIGHT;
   const segments = 6;
   // Все блоки без поворота - фиксированная ориентация 0 градусов

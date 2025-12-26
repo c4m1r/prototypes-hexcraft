@@ -76,6 +76,7 @@ export interface Translations {
   // Game UI
   gameUI: {
     helpHint: string;
+    pressForHints: string;
     debug: string;
     move: string;
     toggleFlyWalk: string;
@@ -200,6 +201,7 @@ const translations: Record<Language, Translations> = {
     },
     gameUI: {
       helpHint: 'Нажмите ` для отладки',
+      pressForHints: 'Нажми ~ для подсказок и Debug меню',
       debug: 'Отладка',
       move: 'WASD - Движение',
       toggleFlyWalk: 'Space (2x) - Переключить Полёт/Ходьбу',
@@ -320,6 +322,7 @@ const translations: Record<Language, Translations> = {
     },
     gameUI: {
       helpHint: 'Press ` for debug',
+      pressForHints: 'Press ~ for hints and Debug menu',
       debug: 'Debug',
       move: 'WASD - Move',
       toggleFlyWalk: 'Space (2x) - Toggle Fly/Walk',
@@ -440,6 +443,7 @@ const translations: Record<Language, Translations> = {
     },
     gameUI: {
       helpHint: 'Presiona ` para depuración',
+      pressForHints: 'Presiona ~ para sugerencias y menú Debug',
       debug: 'Depuración',
       move: 'WASD - Moverse',
       toggleFlyWalk: 'Espacio (2x) - Alternar Vuelo/Caminar',
@@ -560,6 +564,7 @@ const translations: Record<Language, Translations> = {
     },
     gameUI: {
       helpHint: 'Drücke ` für Debug',
+      pressForHints: 'Drücke ~ für Hinweise und Debug-Menü',
       debug: 'Debug',
       move: 'WASD - Bewegen',
       toggleFlyWalk: 'Leertaste (2x) - Flug/Laufen umschalten',
@@ -680,6 +685,7 @@ const translations: Record<Language, Translations> = {
     },
     gameUI: {
       helpHint: '按 ` 进行调试',
+      pressForHints: '按 ~ 查看提示和调试菜单',
       debug: '调试',
       move: 'WASD - 移动',
       toggleFlyWalk: '空格键 (2x) - 切换飞行/步行',
@@ -800,6 +806,7 @@ const translations: Record<Language, Translations> = {
     },
     gameUI: {
       helpHint: '` 키를 눌러 디버그',
+      pressForHints: '~ 키를 눌러 힌트 및 디버그 메뉴',
       debug: '디버그',
       move: 'WASD - 이동',
       toggleFlyWalk: '스페이스바 (2x) - 비행/걷기 전환',
@@ -920,6 +927,7 @@ const translations: Record<Language, Translations> = {
     },
     gameUI: {
       helpHint: '` キーでデバッグ',
+      pressForHints: '~ キーでヒントとデバッグメニュー',
       debug: 'デバッグ',
       move: 'WASD - 移動',
       toggleFlyWalk: 'スペース (2x) - 飛行/歩行切り替え',
