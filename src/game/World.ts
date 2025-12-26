@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { Chunk, Block, BLOCK_TYPES } from '../types/game';
 import { ChunkGenerator } from './ChunkGenerator';
-import { hexToWorld, getChunkKey, worldToChunk, createHexGeometryWithUV, worldToHex, HEX_HEIGHT } from '../utils/hexUtils';
+import { hexToWorld, getChunkKey, worldToChunk, createHexGeometryWithUV, worldToHex, HEX_HEIGHT, HEX_RADIUS } from '../utils/hexUtils';
 import { GameSettings, DEFAULT_SETTINGS } from '../types/settings';
 import { TextureManager } from './TextureManager';
 import { InstancedMeshPool, globalMatrixPool } from '../utils/ObjectPool';
@@ -67,8 +67,11 @@ export class World {
     this.generator = new ChunkGenerator(this.chunkSize, worldSeed);
     this.generatorSeed = this.generator.getSeed();
 
-    // Всегда используем UV геометрию для поддержки текстур (Prototype рендер)
-    this.blockGeometry = createHexGeometryWithUV();
+    // Используем ту же геометрию, что и выделение - стандартный CylinderGeometry
+    // Это обеспечивает правильное соприкосновение гранями
+    // Выделение работает корректно, поэтому используем точно такую же геометрию
+    // В новых версиях Three.js CylinderGeometry уже является BufferGeometry
+    this.blockGeometry = new THREE.CylinderGeometry(HEX_RADIUS, HEX_RADIUS, HEX_HEIGHT, 6);
 
     // Загружаем texture manager для работы с текстурами
     this.textureManager = new TextureManager({
