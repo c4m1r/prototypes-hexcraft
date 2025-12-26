@@ -191,8 +191,20 @@ export class TextureManager {
     );
 
     const imageData = ctx.getImageData(0, 0, this.config.tileSize, this.config.tileSize);
+    
+    // Убеждаемся, что альфа-канал правильный для непрозрачных текстур
+    // Исправляем пиксели с низким альфа-каналом (артефакты сжатия)
+    const data = imageData.data;
+    for (let i = 3; i < data.length; i += 4) {
+      // Если альфа-канал очень маленький (прозрачный пиксель), устанавливаем его в 255 (непрозрачный)
+      // Это предотвращает случайную прозрачность из-за артефактов сжатия или неправильной обработки
+      if (data[i] < 128) {
+        data[i] = 255;
+      }
+    }
+
     const texture = new THREE.DataTexture(
-      imageData.data,
+      data,
       this.config.tileSize,
       this.config.tileSize,
       THREE.RGBAFormat
@@ -244,14 +256,23 @@ export class TextureManager {
     const hasTopTexture = config.top.row !== undefined && config.top.col !== undefined;
     const texturesDifferent = hasTopTexture && (config.top.row !== config.side.row || config.top.col !== config.side.col);
     const useCustomShader = texturesDifferent;
-
+    
     // Включаем прозрачность только если она явно задана в конфиге
     // Для leaves, water, ice, lava всегда включаем прозрачность
     // Для остальных блоков прозрачность определяется только конфигом
     const shouldBeTransparent = (config.transparent === true) || blockId === 'leaves' || blockId === 'water' || blockId === 'ice' || blockId === 'lava';
     
     if (useCustomShader) {
-      return this.createDualTextureMaterial(topTexture, sideTexture, config, shouldBeTransparent);
+      // Для блоков с разными текстурами top и side используем кастомный шейдер
+      const material = this.createDualTextureMaterial(topTexture, sideTexture, config, shouldBeTransparent);
+      if (blockId === 'grass') {
+        console.log('[TextureManager] Grass block using dual texture shader', {
+          topTexture: `${config.top.row},${config.top.col}`,
+          sideTexture: `${config.side.row},${config.side.col}`,
+          transparent: shouldBeTransparent
+        });
+      }
+      return material;
     } else {
       // Если текстуры одинаковые или top не задан, используем side для всех граней
       const material = new THREE.MeshLambertMaterial({
@@ -309,20 +330,19 @@ export class TextureManager {
         // Смешиваем текстуры в зависимости от нормали с плавным переходом
         vec4 color = mix(sideColor, topColor, smoothstep(0.7, 1.0, topFactor));
         
+        // Для непрозрачных блоков игнорируем альфа-канал из текстуры
+        if (opacity >= 1.0) {
+          color.a = 1.0;
+        }
+        
         // Lambert освещение
         vec3 lightDir = normalize(directionalLightDirection);
         float NdotL = max(dot(vWorldNormal, lightDir), 0.0);
         vec3 lighting = ambientLightColor + directionalLightColor * NdotL;
         color.rgb *= lighting;
         
-        // Используем альфа-канал из текстуры, умножаем на opacity только если нужно
-        float finalAlpha = color.a;
-        if (opacity < 1.0) {
-          finalAlpha = color.a * opacity;
-        } else {
-          // Для непрозрачных блоков принудительно устанавливаем альфа = 1.0
-          finalAlpha = 1.0;
-        }
+        // Применяем opacity для прозрачных блоков
+        float finalAlpha = opacity < 1.0 ? color.a * opacity : color.a;
         
         gl_FragColor = vec4(color.rgb, finalAlpha);
       }

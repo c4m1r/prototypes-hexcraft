@@ -316,90 +316,94 @@ const Inventory: React.FC<InventoryProps> = ({
           {/* Персонаж и экипировка */}
           <div className="character-equipment-panel" role="region" aria-labelledby="character-heading">
             <h3 id="character-heading" className="sr-only">Character Equipment</h3>
-            {/* Левая экипировка - функциональная броня */}
-            <div className="equipment-panel armor-panel">
-              <div className="equipment-column">
-                <EquipmentSlot
-                  slot={playerState.equipment?.[0] || { type: 'helmet', item: null, name: t.inventory.helmet }}
-                  onClick={() => {}}
-                />
-                <EquipmentSlot
-                  slot={playerState.equipment?.[1] || { type: 'chestplate', item: null, name: t.inventory.chestplate }}
-                  onClick={() => {}}
-                />
-                <EquipmentSlot
-                  slot={playerState.equipment?.[2] || { type: 'leggings', item: null, name: t.inventory.leggings }}
-                  onClick={() => {}}
-                />
-                <EquipmentSlot
-                  slot={playerState.equipment?.[3] || { type: 'boots', item: null, name: t.inventory.boots }}
-                  onClick={() => {}}
-                />
-                <EquipmentSlot
-                  slot={playerState.equipment?.[4] || { type: 'cape', item: null, name: t.inventory.cape }}
-                  onClick={() => {}}
-                />
-              </div>
-            </div>
-
-            {/* Персонаж - центр */}
-            <div className="character-panel">
-              <div className="character-preview">
-                <div className="character-body">
-                  <div className="character-head"></div>
-                  <div className="character-torso"></div>
-                  <div className="character-legs"></div>
-                </div>
-              </div>
-              <div className="character-name">{playerState?.name || 'Player'}</div>
-            </div>
-
-            {/* Правая экипировка - косметика и аксессуары */}
-            <div className="equipment-panel vanity-accessories-panel">
-              <div className="equipment-column">
-                {/* Косметическая одежда */}
-                <EquipmentSlot
-                  slot={playerState.equipment?.[5] || { type: 'head', item: null, name: t.inventory.head }}
-                  onClick={() => {}}
-                />
-                <EquipmentSlot
-                  slot={playerState.equipment?.[6] || { type: 'chest', item: null, name: t.inventory.chest }}
-                  onClick={() => {}}
-                />
-                <EquipmentSlot
-                  slot={playerState.equipment?.[7] || { type: 'legs', item: null, name: t.inventory.legs }}
-                  onClick={() => {}}
-                />
-                <EquipmentSlot
-                  slot={playerState.equipment?.[8] || { type: 'cape_vanity', item: null, name: t.inventory.cape_vanity }}
-                  onClick={() => {}}
-                />
-
-                {/* Аксессуары - горизонтально */}
-                <div className="equipment-spacer"></div>
-                <div className="accessories-row">
+            
+            <div className="equipment-columns-wrapper">
+              {/* Левая экипировка - функциональная броня */}
+              <div className="equipment-panel armor-panel">
+                <div className="equipment-column">
                   <EquipmentSlot
-                    slot={playerState.equipment?.[9] || { type: 'amulet', item: null, name: t.inventory.amulet }}
+                    slot={playerState.equipment?.[0] || { type: 'helmet', item: null, name: t.inventory.helmet }}
                     onClick={() => {}}
                   />
                   <EquipmentSlot
-                    slot={playerState.equipment?.[10] || { type: 'ring1', item: null, name: t.inventory.ring1 }}
+                    slot={playerState.equipment?.[1] || { type: 'chestplate', item: null, name: t.inventory.chestplate }}
                     onClick={() => {}}
                   />
                   <EquipmentSlot
-                    slot={playerState.equipment?.[11] || { type: 'ring2', item: null, name: t.inventory.ring2 }}
+                    slot={playerState.equipment?.[2] || { type: 'leggings', item: null, name: t.inventory.leggings }}
                     onClick={() => {}}
                   />
                   <EquipmentSlot
-                    slot={playerState.equipment?.[12] || { type: 'artifact1', item: null, name: t.inventory.artifact1 }}
+                    slot={playerState.equipment?.[3] || { type: 'boots', item: null, name: t.inventory.boots }}
                     onClick={() => {}}
                   />
                   <EquipmentSlot
-                    slot={playerState.equipment?.[13] || { type: 'artifact2', item: null, name: t.inventory.artifact2 }}
+                    slot={playerState.equipment?.[4] || { type: 'cape', item: null, name: t.inventory.cape }}
                     onClick={() => {}}
                   />
                 </div>
               </div>
+
+              {/* Персонаж - центр */}
+              <div className="character-panel">
+                <div className="character-preview">
+                  <div className="character-body">
+                    <div className="character-head"></div>
+                    <div className="character-torso"></div>
+                    <div className="character-legs"></div>
+                  </div>
+                </div>
+                <div className="character-name">{playerState?.name || 'Player'}</div>
+              </div>
+
+              {/* Правая экипировка - косметика */}
+              <div className="equipment-panel vanity-panel">
+                <div className="equipment-column">
+                  <EquipmentSlot
+                    slot={playerState.equipment?.[5] || { type: 'head', item: null, name: t.inventory.head }}
+                    onClick={() => {}}
+                  />
+                  <EquipmentSlot
+                    slot={playerState.equipment?.[6] || { type: 'chest', item: null, name: t.inventory.chest }}
+                    onClick={() => {}}
+                  />
+                  <EquipmentSlot
+                    slot={playerState.equipment?.[7] || { type: 'legs', item: null, name: t.inventory.legs }}
+                    onClick={() => {}}
+                  />
+                  <EquipmentSlot
+                    slot={playerState.equipment?.[8] || { type: 'cape_vanity', item: null, name: t.inventory.cape_vanity }}
+                    onClick={() => {}}
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Общий разделитель под обеими колонками */}
+            <div className="equipment-spacer-full"></div>
+
+            {/* Аксессуары - горизонтально между столбцами */}
+            <div className="accessories-row-full">
+              <EquipmentSlot
+                slot={playerState.equipment?.[9] || { type: 'amulet', item: null, name: t.inventory.amulet }}
+                onClick={() => {}}
+              />
+              <EquipmentSlot
+                slot={playerState.equipment?.[10] || { type: 'ring1', item: null, name: t.inventory.ring1 }}
+                onClick={() => {}}
+              />
+              <EquipmentSlot
+                slot={playerState.equipment?.[11] || { type: 'ring2', item: null, name: t.inventory.ring2 }}
+                onClick={() => {}}
+              />
+              <EquipmentSlot
+                slot={playerState.equipment?.[12] || { type: 'artifact1', item: null, name: t.inventory.artifact1 }}
+                onClick={() => {}}
+              />
+              <EquipmentSlot
+                slot={playerState.equipment?.[13] || { type: 'artifact2', item: null, name: t.inventory.artifact2 }}
+                onClick={() => {}}
+              />
             </div>
           </div>
 

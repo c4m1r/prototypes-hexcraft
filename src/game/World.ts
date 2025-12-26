@@ -102,11 +102,8 @@ export class World {
     this.updateFogDensity();
   }
 
-  setRenderingMode(mode: 'prototype' | 'modern'): void {
-    // Режим 'modern' = текстуры включены, 'prototype' = текстуры выключены (цвета)
-    const shouldUseTextures = mode === 'modern';
-
-    if (this.useTextures === shouldUseTextures) return;
+  toggleUseTextures(): void {
+    const shouldUseTextures = !this.useTextures;
 
     console.log(`[World] Switching texture mode: ${shouldUseTextures ? 'textures ON' : 'colors ON'}`);
 
@@ -172,21 +169,9 @@ export class World {
   }
 
   async initializeAsync(): Promise<void> {
-    // КРИТИЧНО: Генерируем чанк (0,0) полностью перед добавлением в сцену
-    // Это соответствует стартовому контракту
+    // Метод оставлен для совместимости, но больше не генерирует специальный чанк (0,0)
+    // Чанки будут генерироваться естественным образом через update() и requestChunk()
     await new Promise<void>(resolve => requestAnimationFrame(() => resolve()));
-    
-    const chunk = this.generator.generateChunk(0, 0);
-    const key = getChunkKey(0, 0);
-    
-    this.chunks.set(key, chunk);
-    this.loadAttempts += 1;
-    this.createChunkMeshes(chunk);
-
-    if (this.chunks.size === 0 && this.debugLogsLeft > 0) {
-      console.error('[World] После initializeAsync чанки не загружены, size=0');
-      this.debugLogsLeft -= 1;
-    }
   }
 
   // КРИТИЧНО: update() может только запрашивать чанки, но не генерировать их
@@ -425,6 +410,8 @@ export class World {
       for (let index = 0; index < blocks.length; index++) {
         const block = blocks[index];
         const worldPos = hexToWorld(block.position.q, block.position.r, block.position.y);
+        // Убеждаемся, что матрица сброшена (без поворотов)
+        matrix.identity();
         matrix.setPosition(worldPos);
         mesh.setMatrixAt(index, matrix);
       }

@@ -9,6 +9,7 @@ interface GameUIProps {
   playerPosition: { x: number; y: number; z: number };
   isFlying: boolean;
   targetBlock: string | null;
+  targetBlockCoords: { q: number; r: number; y: number } | null;
   targetBiome: string | null;
   showFogBarrier: boolean;
   currentTime: string;
@@ -31,6 +32,7 @@ export const GameUI = React.memo(function GameUI({
   playerPosition,
   isFlying,
   targetBlock,
+  targetBlockCoords,
   targetBiome,
   showFogBarrier,
   currentTime,
@@ -179,9 +181,7 @@ export const GameUI = React.memo(function GameUI({
             {t.gameUI.generationStatus}: {generationStatus}
           </div>
 
-          <div>X: {playerPosition.x.toFixed(2)}</div>
-          <div>Y: {playerPosition.y.toFixed(2)}</div>
-          <div>Z: {playerPosition.z.toFixed(2)}</div>
+          <div>Pos: X: {playerPosition.x.toFixed(2)} Y: {playerPosition.y.toFixed(2)} Z: {playerPosition.z.toFixed(2)}</div>
 
           <div className="pt-2 border-t border-white/30">
             {t.gameUI.mode}: {isFlying ? t.gameUI.fly : t.gameUI.walk}
@@ -190,6 +190,7 @@ export const GameUI = React.memo(function GameUI({
           {targetBlock && (
             <div className="pt-2 border-t border-white/30 font-medium text-green-400">
               {t.gameUI.block}: {targetBlock}
+              {targetBlockCoords && ` (q:${targetBlockCoords.q} r:${targetBlockCoords.r} y:${targetBlockCoords.y} rot:0)`}
             </div>
           )}
 

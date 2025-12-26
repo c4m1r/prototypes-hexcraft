@@ -6,11 +6,19 @@ export class DayNightCycle {
   private ambientLight: THREE.AmbientLight;
   private cycleTime: number = 0;
   private cycleDuration: number = 14 * 60;
+  private fogDisabled: boolean = false;
 
   constructor(scene: THREE.Scene, sunLight: THREE.DirectionalLight, ambientLight: THREE.AmbientLight) {
     this.scene = scene;
     this.sunLight = sunLight;
     this.ambientLight = ambientLight;
+  }
+
+  setFogDisabled(disabled: boolean): void {
+    this.fogDisabled = disabled;
+    if (disabled) {
+      this.scene.fog = null;
+    }
   }
 
   update(deltaTime: number): void {
@@ -41,7 +49,9 @@ export class DayNightCycle {
         Math.min(sunHeight * 2, 1)
       );
       this.scene.background = skyColor;
-      this.scene.fog = new THREE.Fog(skyColor.getHex(), 50, 150);
+      if (!this.fogDisabled) {
+        this.scene.fog = new THREE.Fog(skyColor.getHex(), 50, 150);
+      }
     } else {
       const nightIntensity = Math.max(0, -sunHeight);
       this.sunLight.intensity = 0.1;
@@ -53,7 +63,9 @@ export class DayNightCycle {
         Math.max(0, 1 + sunHeight * 2)
       );
       this.scene.background = nightColor;
-      this.scene.fog = new THREE.Fog(nightColor.getHex(), 30, 100);
+      if (!this.fogDisabled) {
+        this.scene.fog = new THREE.Fog(nightColor.getHex(), 30, 100);
+      }
     }
   }
 

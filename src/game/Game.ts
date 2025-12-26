@@ -11,6 +11,7 @@ export interface GameState {
   playerPosition: { x: number; y: number; z: number };
   isFlying: boolean;
   targetBlock: string | null;
+  targetBlockCoords: { q: number; r: number; y: number } | null;
   targetBiome: string | null;
   showFogBarrier: boolean;
   currentTime: string;
@@ -55,6 +56,7 @@ export class Game {
   private nextItemId: number = 0;
   private droppedItemMeshes: Map<string, THREE.Mesh> = new Map();
   private savedFogDensity: number = 1;
+  private fogEffectsDisabled: boolean = false;
 
   private initializeInventory() {
     const INVENTORY_SIZE = 27;
@@ -215,7 +217,7 @@ export class Game {
 
     document.addEventListener('keydown', (e) => {
       if (e.code === 'KeyF') {
-        this.world.toggleFogBarrier();
+        this.toggleFogEffects();
       }
     });
   }
@@ -295,6 +297,11 @@ export class Game {
         },
         isFlying: this.player.isFlying,
         targetBlock: targetedBlock?.name || null,
+        targetBlockCoords: targetedBlock ? {
+          q: targetedBlock.block.position.q,
+          r: targetedBlock.block.position.r,
+          y: targetedBlock.block.position.y
+        } : null,
         targetBiome: targetedBlock ? this.world.getBiomeAt(this.player.position.x, this.player.position.z) : null,
         showFogBarrier: this.world.getFogBarrierState(),
         currentTime: this.dayNightCycle.getCurrentTime(),
@@ -331,28 +338,53 @@ export class Game {
     this.playerEquipment = equipment;
   }
 
-  setRenderingMode(mode: 'prototype' | 'modern') {
-    this.world.setRenderingMode(mode);
+  toggleUseTextures() {
+    this.world.toggleUseTextures();
   }
 
   toggleFogEffects() {
-    // Переключаем барьер тумана
-    this.world.toggleFogBarrier();
+    this.fogEffectsDisabled = !this.fogEffectsDisabled;
 
-    // Переключаем плотность тумана (выключаем/включаем)
-    const currentFogDensity = this.world.getFogDensity();
-    if (currentFogDensity > 0) {
-      // Сохраняем текущую плотность и выключаем
-      this.savedFogDensity = currentFogDensity;
-      this.world.setFogDensity(0);
+    // Переключаем барьер тумана
+    if (this.fogEffectsDisabled) {
+      // Выключаем все эффекты затемнения
+      this.world.toggleFogBarrier(); // Выключаем если был включен
+      if (this.world.getFogBarrierState()) {
+        this.world.toggleFogBarrier(); // Гарантируем выключение
+      }
+      
+      // Сохраняем текущую плотность тумана и выключаем
+      const currentFogDensity = this.world.getFogDensity();
+      if (currentFogDensity > 0) {
+        this.savedFogDensity = currentFogDensity;
+        this.world.setFogDensity(0);
+      }
+      
+      // Отключаем туман в DayNightCycle
+      this.dayNightCycle.setFogDisabled(true);
+      
+      // Убираем туман из сцены полностью
+      this.scene.fog = null;
     } else {
-      // Восстанавливаем сохраненную плотность
+      // Включаем все эффекты затемнения обратно
+      if (!this.world.getFogBarrierState()) {
+        this.world.toggleFogBarrier(); // Включаем если был выключен
+      }
+      
+      // Восстанавливаем сохраненную плотность тумана
       this.world.setFogDensity(this.savedFogDensity || 1);
+      
+      // Включаем туман в DayNightCycle (он сам установит правильный туман при следующем update)
+      this.dayNightCycle.setFogDisabled(false);
     }
   }
 
   toggleFogBarrier() {
     this.world.toggleFogBarrier();
+  }
+
+  getFogBarrierState(): boolean {
+    return this.world.getFogBarrierState();
   }
 
   private createDroppedItem(block: Block): void {

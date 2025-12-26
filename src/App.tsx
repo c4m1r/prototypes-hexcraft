@@ -1,11 +1,9 @@
 import { useEffect, useRef, useState, Suspense, lazy } from 'react';
 import { Game, GameState } from './game/Game';
 import { InventorySlot, EquipmentSlot } from './types/game';
-import { GameSettings, DEFAULT_SETTINGS, WorldSetup, RenderingMode } from './types/settings';
+import { GameSettings, DEFAULT_SETTINGS, WorldSetup } from './types/settings';
 import { LanguageProvider } from './contexts/LanguageContext';
 import { Language } from './utils/i18n';
-import { World } from './game/World';
-import * as THREE from 'three';
 import { hexToWorld } from './utils/hexUtils';
 import { ErrorBoundary } from './components/ErrorBoundary';
 
@@ -42,6 +40,7 @@ function App() {
     playerPosition: { x: 0, y: 0, z: 0 },
     isFlying: true,
     targetBlock: null,
+    targetBlockCoords: null,
     targetBiome: null,
     showFogBarrier: true,
     currentTime: '06:00',
@@ -52,6 +51,11 @@ function App() {
     generationStatus: 'chunks:0 meshes:0 rd:0 cs:0/0',
     playerState: {
       name: 'Player',
+      position: { x: 0, y: 0, z: 0 },
+      rotation: { x: 0, y: 0 },
+      velocity: { x: 0, y: 0, z: 0 },
+      isFlying: true,
+      selectedSlot: 0,
       inventory: [],
       hotbar: [],
       equipment: []
@@ -138,20 +142,9 @@ function App() {
         }
         if (e.key === 'F2') {
           e.preventDefault();
-          const currentSettings = settingsRef.current;
-          const newMode: RenderingMode = currentSettings.renderingMode === 'prototype' ? 'modern' : 'prototype';
-          console.log('Switching texture mode to:', newMode);
-
-          // Обновляем настройки
-          const updatedSettings = { ...currentSettings, renderingMode: newMode };
-          settingsRef.current = updatedSettings;
-          setSettings(updatedSettings);
-
           if (gameRef.current) {
-            gameRef.current.setRenderingMode(newMode);
-            console.log('Texture mode switched successfully');
-          } else {
-            console.log('Game ref not available');
+            gameRef.current.toggleUseTextures();
+            console.log('Texture mode toggled');
           }
         }
         if (e.key === 'F') {
@@ -165,16 +158,11 @@ function App() {
             // Обновляем состояние игры
             setGameState(prev => ({
               ...prev,
-              showFogBarrier: !prev.showFogBarrier
+              showFogBarrier: gameRef.current?.getFogBarrierState() ?? !prev.showFogBarrier
             }));
 
             console.log('Fog and lighting effects toggled');
           }
-        }
-        if (e.key === 'F') {
-          e.preventDefault();
-          // Toggle fog barrier
-          gameRef.current?.toggleFogBarrier();
         }
         if (e.code === 'Escape') {
           setCurrentScreen('menu');
@@ -215,38 +203,15 @@ function App() {
     setLoadingProgress(20);
     setLoadingStatus('Создание мира...');
 
-    // 3. Создаем временную сцену для генерации первого чанка
-    const tempScene = new THREE.Scene();
-    const tempWorld = new World(tempScene, mergedSettings);
-    tempWorld.initialize();
-    
-    setLoadingProgress(40);
-    setLoadingStatus('Генерация первого чанка...');
+    setLoadingProgress(50);
+    setLoadingStatus('Инициализация...');
 
-    // 4. Генерируем чанк (0,0) полностью
-    await tempWorld.initializeAsync();
-    
-    setLoadingProgress(70);
-    setLoadingStatus('Поиск точки спавна...');
-
-    // 5. Находим высоту спавна
-    let spawnHeight: number | null = tempWorld.getHighestBlockAt(0, 0);
-
-    if (spawnHeight === null) {
-      console.warn('[App] Чанк (0,0) не содержит блоков, используем высоту по умолчанию');
-      spawnHeight = 10; // Высота по умолчанию
-    }
-
-    // Сохраняем позицию спавна для использования при инициализации игры
-    const finalHeight = spawnHeight !== null ? spawnHeight + 1.7 : 11.7; // spawnHeight теперь уже правильная поверхность блока
+    // Используем фиксированную высоту спавна
     const spawnPos = hexToWorld(0, 0, 0);
-    setSpawnPosition({ x: spawnPos.x, y: finalHeight, z: spawnPos.z });
+    setSpawnPosition({ x: spawnPos.x, y: 15, z: spawnPos.z });
 
-    setLoadingProgress(85);
-    setLoadingStatus('Размещение игрока...');
-
-    // Очищаем временную сцену
-    tempScene.clear();
+    setLoadingProgress(70);
+    setLoadingStatus('Готово...');
 
     // Yield к браузеру перед переключением экрана
     await new Promise<void>(resolve => requestAnimationFrame(() => resolve()));
@@ -343,6 +308,7 @@ function App() {
             playerPosition={gameState.playerPosition}
             isFlying={gameState.isFlying}
             targetBlock={gameState.targetBlock}
+            targetBlockCoords={gameState.targetBlockCoords}
             targetBiome={gameState.targetBiome}
             showFogBarrier={gameState.showFogBarrier}
             currentTime={gameState.currentTime}

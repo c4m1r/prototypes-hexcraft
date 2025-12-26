@@ -65,8 +65,7 @@ export function createHexGeometryWithUV(): THREE.BufferGeometry {
   const radius = HEX_RADIUS; // Радиус = size для pointy-top
   const height = HEX_HEIGHT;
   const segments = 6;
-  // Возвращаем к исходному варианту без поворота
-  const rotationOffset = 0;
+  // Все блоки без поворота - фиксированная ориентация 0 градусов
 
   // Верхняя грань (верхняя текстура)
   const topCenterIndex = vertices.length / 3;
@@ -75,13 +74,13 @@ export function createHexGeometryWithUV(): THREE.BufferGeometry {
   uvs.push(0.5, 0.5); // Центр верхней текстуры
 
   for (let i = 0; i <= segments; i++) {
-    const angle = (i / segments) * Math.PI * 2 + rotationOffset;
+    const angle = (i / segments) * Math.PI * 2;
     const x = Math.cos(angle) * radius;
     const z = Math.sin(angle) * radius;
     vertices.push(x, height / 2, z);
     normals.push(0, 1, 0);
-    // UV для верхней грани (центр в 0.5, 0.5) - с тем же поворотом что и вершины
-    const uvAngle = (i / segments) * Math.PI * 2 + rotationOffset;
+    // UV для верхней грани (центр в 0.5, 0.5) - без поворота
+    const uvAngle = (i / segments) * Math.PI * 2;
     const u = 0.5 + Math.cos(uvAngle) * 0.5;
     const v = 0.5 + Math.sin(uvAngle) * 0.5;
     uvs.push(u, v);
@@ -99,7 +98,7 @@ export function createHexGeometryWithUV(): THREE.BufferGeometry {
   uvs.push(0.5, 0.5);
 
   for (let i = 0; i <= segments; i++) {
-    const angle = (i / segments) * Math.PI * 2 + rotationOffset;
+    const angle = (i / segments) * Math.PI * 2;
     const x = Math.cos(angle) * radius;
     const z = Math.sin(angle) * radius;
     vertices.push(x, -height / 2, z);
@@ -119,10 +118,10 @@ export function createHexGeometryWithUV(): THREE.BufferGeometry {
   // Боковые грани (боковая текстура)
   const sideStartIndex = vertices.length / 3;
   for (let i = 0; i <= segments; i++) {
-    const angle = (i / segments) * Math.PI * 2 + rotationOffset;
+    const angle = (i / segments) * Math.PI * 2;
     const x = Math.cos(angle) * radius;
     const z = Math.sin(angle) * radius;
-    const nextAngle = ((i + 1) % (segments + 1)) / segments * Math.PI * 2 + rotationOffset;
+    const nextAngle = ((i + 1) % (segments + 1)) / segments * Math.PI * 2;
     const nextX = Math.cos(nextAngle) * radius;
     const nextZ = Math.sin(nextAngle) * radius;
 
