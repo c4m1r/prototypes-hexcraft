@@ -140,7 +140,7 @@ function App() {
           e.preventDefault();
           const currentSettings = settingsRef.current;
           const newMode: RenderingMode = currentSettings.renderingMode === 'prototype' ? 'modern' : 'prototype';
-          console.log('Switching rendering mode to:', newMode);
+          console.log('Switching texture mode to:', newMode);
 
           // Обновляем настройки
           const updatedSettings = { ...currentSettings, renderingMode: newMode };
@@ -149,9 +149,26 @@ function App() {
 
           if (gameRef.current) {
             gameRef.current.setRenderingMode(newMode);
-            console.log('Rendering mode switched successfully');
+            console.log('Texture mode switched successfully');
           } else {
             console.log('Game ref not available');
+          }
+        }
+        if (e.key === 'F') {
+          e.preventDefault();
+          console.log('Toggling fog and lighting effects');
+
+          if (gameRef.current) {
+            // Переключаем все эффекты тумана и освещения
+            gameRef.current.toggleFogEffects();
+
+            // Обновляем состояние игры
+            setGameState(prev => ({
+              ...prev,
+              showFogBarrier: !prev.showFogBarrier
+            }));
+
+            console.log('Fog and lighting effects toggled');
           }
         }
         if (e.key === 'F') {
@@ -222,7 +239,7 @@ function App() {
     }
 
     // Сохраняем позицию спавна для использования при инициализации игры
-    const finalHeight = spawnHeight !== null ? spawnHeight + 1.7 : 11.7; // Высота игрока + отступ
+    const finalHeight = spawnHeight !== null ? spawnHeight + 1.7 : 11.7; // spawnHeight теперь уже правильная поверхность блока
     const spawnPos = hexToWorld(0, 0, 0);
     setSpawnPosition({ x: spawnPos.x, y: finalHeight, z: spawnPos.z });
 

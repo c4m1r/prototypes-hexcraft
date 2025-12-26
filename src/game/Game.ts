@@ -55,6 +55,7 @@ export class Game {
   private nextItemId: number = 0;
   private droppedItemMeshes: Map<string, THREE.Mesh> = new Map();
   private renderingMode: 'prototype' | 'modern' = 'prototype';
+  private savedFogDensity: number = 1;
 
   private initializeInventory() {
     const INVENTORY_SIZE = 27;
@@ -333,6 +334,22 @@ export class Game {
 
   setRenderingMode(mode: 'prototype' | 'modern') {
     this.world.setRenderingMode(mode);
+  }
+
+  toggleFogEffects() {
+    // Переключаем барьер тумана
+    this.world.toggleFogBarrier();
+
+    // Переключаем плотность тумана (выключаем/включаем)
+    const currentFogDensity = this.world.getFogDensity();
+    if (currentFogDensity > 0) {
+      // Сохраняем текущую плотность и выключаем
+      this.savedFogDensity = currentFogDensity;
+      this.world.setFogDensity(0);
+    } else {
+      // Восстанавливаем сохраненную плотность
+      this.world.setFogDensity(this.savedFogDensity || 1);
+    }
   }
 
   toggleFogBarrier() {

@@ -49,6 +49,7 @@ export class World {
     this.maxLoadedChunks = finalSettings.maxLoadedChunks;
     this.renderDistance = finalSettings.renderDistance;
     this.fogDensity = finalSettings.fogDensity;
+    // Используем текстуры если они включены в настройках
     this.useTextures = finalSettings.renderingMode === 'modern';
 
     // Чтобы избежать постоянного удаления/добавления чанков, гарантируем,
@@ -66,10 +67,10 @@ export class World {
     this.generator = new ChunkGenerator(this.chunkSize, worldSeed);
     this.generatorSeed = this.generator.getSeed();
 
-    // Всегда используем UV геометрию для поддержки текстур
-    this.blockGeometry = createHexGeometryWithUV();
+    // Начинаем с обычной геометрии
+    this.blockGeometry = createHexGeometry();
 
-    // Пытаемся загрузить текстуры
+    // Загружаем texture manager для анимированных текстур
     this.textureManager = new TextureManager({
       atlasSize: 320,
       tileSize: 32,
@@ -80,9 +81,14 @@ export class World {
     const texturePath = new URL('./texutres.png', import.meta.url).href;
     this.textureManager.loadAtlas(texturePath).then(() => {
       console.log('[World] Textures loaded successfully');
+      // Если текстуры нужны, переключаемся на UV геометрию
+      if (this.useTextures) {
+        this.blockGeometry = createHexGeometryWithUV();
+      }
       this.initializeMaterials();
     }).catch(err => {
-      console.warn('[World] Failed to load textures, using colors:', err);
+      console.warn('[World] Failed to load textures:', err);
+      // Отключаем текстуры если не загрузились
       this.useTextures = false;
       this.initializeMaterials();
     });
@@ -104,7 +110,7 @@ export class World {
 
     if (this.useTextures === shouldUseTextures) return;
 
-    console.log(`[World] Switching rendering mode to ${mode}`);
+    console.log(`[World] Switching to ${mode} rendering mode`);
 
     // Если текстуры не загружены и пытаемся переключиться на modern, ничего не делаем
     if (shouldUseTextures && !this.textureManager) {
@@ -113,6 +119,13 @@ export class World {
     }
 
     this.useTextures = shouldUseTextures;
+
+    // Меняем геометрию если нужно
+    if (shouldUseTextures && !this.blockGeometry.userData.uv) {
+      this.blockGeometry = createHexGeometryWithUV();
+    } else if (!shouldUseTextures && this.blockGeometry.userData.uv) {
+      this.blockGeometry = createHexGeometry();
+    }
 
     // Переинициализируем материалы для нового режима
     this.initializeMaterials();
@@ -126,7 +139,7 @@ export class World {
 
   private initializeMaterials(): void {
     BLOCK_TYPES.forEach(blockType => {
-      // Пытаемся использовать текстуры если они доступны и включены
+      // Если текстуры включены и доступны, используем их
       if (this.useTextures && this.textureManager) {
         const material = this.textureManager.createMaterial(blockType.id, this.animationTime, blockType.color);
         if (material) {
@@ -135,7 +148,7 @@ export class World {
         }
       }
 
-      // Fallback на цвета (как в prototype режиме)
+      // Fallback на цвета (prototype режим)
       const isLeaves = blockType.id === 'leaves';
       const isWater = blockType.id === 'water';
       const isIce = blockType.id === 'ice';
@@ -896,6 +909,15 @@ export class World {
     return this.showFogBarrier;
   }
 
+  getFogDensity(): number {
+    return this.fogDensity;
+  }
+
+  setFogDensity(density: number): void {
+    this.fogDensity = density;
+    this.updateFogDensity();
+  }
+
   private updateFogDensity(): void {
     const baseNear = 50 / this.fogDensity;
     const baseFar = 150 / this.fogDensity;
@@ -943,7 +965,7 @@ export class World {
 
     // Конвертируем в мировые координаты
     const worldPosWithHeight = hexToWorld(q, r, highestY);
-    return worldPosWithHeight.y + HEX_HEIGHT / 2; // Возвращаем верхнюю точку блока
+    return worldPosWithHeight.y + HEX_HEIGHT; // Возвращаем верхнюю точку блока
   }
 
   getDebugInfo(): {

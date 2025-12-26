@@ -200,7 +200,7 @@ export const GameUI = React.memo(function GameUI({
           )}
 
           <div className="pt-2 border-t border-white/30 text-xs text-gray-300">
-            F: Fog {showFogBarrier ? t.gameUI.fogOn : t.gameUI.fogOff}
+            F: Effects {showFogBarrier ? t.gameUI.fogOn : t.gameUI.fogOff}
           </div>
 
           <div className="pt-2 border-t border-white/30 text-xs">
