@@ -1,23 +1,34 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, Suspense, lazy } from 'react';
 import { Game, GameState } from './game/Game';
 import { InventorySlot, EquipmentSlot } from './types/game';
-import { GameUI } from './components/GameUI';
-import { MainMenu } from './components/MainMenu';
-import { AboutPage } from './components/AboutPage';
-import { OptionsPage } from './components/OptionsPage';
-import { WorldSetupMenu } from './components/WorldSetupMenu';
-import { LoadingScreen } from './components/LoadingScreen';
-import { GameSettings, DEFAULT_SETTINGS, WorldSetup } from './types/settings';
+import { GameSettings, DEFAULT_SETTINGS, WorldSetup, RenderingMode } from './types/settings';
 import { LanguageProvider } from './contexts/LanguageContext';
 import { Language } from './utils/i18n';
 import { World } from './game/World';
 import * as THREE from 'three';
 import { hexToWorld } from './utils/hexUtils';
+import { ErrorBoundary } from './components/ErrorBoundary';
+
+// Lazy load heavy components
+const GameUI = lazy(() => import('./components/GameUI').then(module => ({ default: module.GameUI })));
+const MainMenu = lazy(() => import('./components/MainMenu').then(module => ({ default: module.MainMenu })));
+const AboutPage = lazy(() => import('./components/AboutPage').then(module => ({ default: module.AboutPage })));
+const OptionsPage = lazy(() => import('./components/OptionsPage').then(module => ({ default: module.OptionsPage })));
+const WorldSetupMenu = lazy(() => import('./components/WorldSetupMenu').then(module => ({ default: module.WorldSetupMenu })));
+const LoadingScreen = lazy(() => import('./components/LoadingScreen').then(module => ({ default: module.LoadingScreen })));
 
 type Screen = 'menu' | 'worldSetup' | 'loading' | 'game' | 'about' | 'options';
 
 function App() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  // Error handler for main app
+  const handleAppError = (error: Error, errorInfo: React.ErrorInfo) => {
+    console.error('App Error:', error, errorInfo);
+
+    // In production, send to error reporting service
+    // Example: Sentry.captureException(error, { contexts: { react: errorInfo } });
+  };
   const gameRef = useRef<Game | null>(null);
   const settingsRef = useRef<GameSettings>(DEFAULT_SETTINGS);
   const [currentScreen, setCurrentScreen] = useState<Screen>('menu');
@@ -128,7 +139,7 @@ function App() {
         if (e.key === 'F2') {
           e.preventDefault();
           const currentSettings = settingsRef.current;
-          const newMode = currentSettings.renderingMode === 'prototype' ? 'modern' : 'prototype';
+          const newMode: RenderingMode = currentSettings.renderingMode === 'prototype' ? 'modern' : 'prototype';
           console.log('Switching rendering mode to:', newMode);
 
           // Обновляем настройки
@@ -264,12 +275,18 @@ function App() {
   };
 
   return (
-    <LanguageProvider language={language} setLanguage={(lang) => {
-      setLanguage(lang);
-      setSettings({ ...settings, language: lang });
-    }}>
+    <ErrorBoundary onError={handleAppError}>
+      <LanguageProvider language={language} setLanguage={(lang) => {
+        setLanguage(lang);
+        setSettings({ ...settings, language: lang });
+      }}>
       <div className="relative w-full h-screen overflow-hidden">
-      {currentScreen === 'menu' && (
+        <Suspense fallback={
+          <div className="flex items-center justify-center w-full h-full bg-black">
+            <div className="text-white text-xl">Loading...</div>
+          </div>
+        }>
+          {currentScreen === 'menu' && (
         <MainMenu
           onNewGame={handleNewGame}
           onLoadGame={handleLoadGame}
@@ -283,7 +300,6 @@ function App() {
         <WorldSetupMenu
           onStart={handleWorldSetupStart}
           onBack={handleWorldSetupBack}
-          defaultRenderingMode={settings.renderingMode}
         />
       )}
 
@@ -329,8 +345,10 @@ function App() {
           />
         </>
       )}
+        </Suspense>
       </div>
     </LanguageProvider>
+    </ErrorBoundary>
   );
 }
 

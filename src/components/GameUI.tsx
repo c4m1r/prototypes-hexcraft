@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import Inventory from './Inventory';
-import { InventorySlot, EquipmentSlot } from '../types/game';
+import { InventorySlot, EquipmentSlot, PlayerState } from '../types/game';
 import { useLanguage } from '../contexts/LanguageContext';
 import './Inventory.css';
 
@@ -18,7 +18,7 @@ interface GameUIProps {
   hunger: number;
   generationCode: string;
   generationStatus: string;
-  playerState: any; // TODO: типизировать
+  playerState: PlayerState;
   inventoryOpen: boolean;
   onInventoryToggle: () => void;
   onInventoryChange: (inventory: InventorySlot[]) => void;
@@ -26,7 +26,7 @@ interface GameUIProps {
   onEquipmentChange: (equipment: EquipmentSlot[]) => void;
 }
 
-export function GameUI({
+export const GameUI = React.memo(function GameUI({
   showDebug,
   playerPosition,
   isFlying,
@@ -226,4 +226,4 @@ export function GameUI({
       )}
     </>
   );
-}
+});

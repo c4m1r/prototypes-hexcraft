@@ -1,4 +1,3 @@
-import { useLanguage } from '../contexts/LanguageContext';
 
 interface LoadingScreenProps {
   progress: number;
@@ -6,7 +5,6 @@ interface LoadingScreenProps {
 }
 
 export function LoadingScreen({ progress, status }: LoadingScreenProps) {
-  const { t } = useLanguage();
 
   return (
     <div className="fixed inset-0 bg-black flex items-center justify-center">

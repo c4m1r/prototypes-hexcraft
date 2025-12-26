@@ -18,6 +18,7 @@ export interface WorldSetup {
   playerName: string;
   gameMode: GameMode;
   seed: number;
+  renderingMode: RenderingMode;
 }
 
 export const DEFAULT_SETTINGS: GameSettings = {
@@ -26,7 +27,7 @@ export const DEFAULT_SETTINGS: GameSettings = {
   biomeSize: 1,
   chunkSize: 14,
   maxLoadedChunks: 15,
-  renderingMode: 'prototype',
+  renderingMode: 'modern',
   seed: Math.floor(Math.random() * 1_000_000_000),
   language: 'ru'
 };

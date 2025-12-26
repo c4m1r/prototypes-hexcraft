@@ -1,5 +1,14 @@
 import * as THREE from 'three';
 
+// Extend THREE.Material to include custom animation properties
+declare module 'three' {
+  interface Material {
+    topTexture?: THREE.Texture;
+    sideTexture?: THREE.Texture;
+    animationOffset?: number;
+  }
+}
+
 export interface TextureAtlasConfig {
   atlasSize: number; // 320
   tileSize: number; // 32
@@ -251,8 +260,8 @@ export class TextureManager {
         alphaTest: shouldBeTransparent ? 0.1 : 1.0 // Для непрозрачных блоков игнорируем альфа-канал (alphaTest > 0.99)
       });
 
-      (material as any).topTexture = sideTexture; // Используем side как fallback
-      (material as any).sideTexture = sideTexture;
+      material.topTexture = sideTexture; // Используем side как fallback
+      material.sideTexture = sideTexture;
 
       return material;
     }

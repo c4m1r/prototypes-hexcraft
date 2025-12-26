@@ -4,7 +4,7 @@ import { PlayerController } from './PlayerController';
 import { RaycastManager } from './RaycastManager';
 import { DayNightCycle } from './DayNightCycle';
 import { GameSettings } from '../types/settings';
-import { InventorySlot, DroppedItem, ITEMS, EquipmentSlot } from '../types/game';
+import { InventorySlot, DroppedItem, ITEMS, EquipmentSlot, PlayerState } from '../types/game';
 import { hexToWorld, HEX_HEIGHT } from '../utils/hexUtils';
 
 export interface GameState {
@@ -19,11 +19,7 @@ export interface GameState {
   hunger: number;
   generationCode: string;
   generationStatus: string;
-  playerState: {
-    name: string;
-    inventory: InventorySlot[];
-    hotbar: InventorySlot[];
-  };
+  playerState: PlayerState;
   droppedItems: DroppedItem[];
 }
 
@@ -67,20 +63,22 @@ export class Game {
     // Инициализация пустого инвентаря
     this.playerInventory = Array(INVENTORY_SIZE).fill(null).map(() => ({ item: null, count: 0 }));
 
-    // Инициализация экипировки
+    // Инициализация экипировки (14 слотов)
     this.playerEquipment = [
       { type: 'helmet', item: null, name: 'Helmet' },
       { type: 'chestplate', item: null, name: 'Chestplate' },
       { type: 'leggings', item: null, name: 'Leggings' },
       { type: 'boots', item: null, name: 'Boots' },
       { type: 'cape', item: null, name: 'Cape' },
+      { type: 'head', item: null, name: 'Head' },
+      { type: 'chest', item: null, name: 'Chest' },
+      { type: 'legs', item: null, name: 'Legs' },
+      { type: 'cape_vanity', item: null, name: 'Cape (Vanity)' },
+      { type: 'amulet', item: null, name: 'Amulet' },
+      { type: 'ring1', item: null, name: 'Ring 1' },
+      { type: 'ring2', item: null, name: 'Ring 2' },
       { type: 'artifact1', item: null, name: 'Artifact 1' },
       { type: 'artifact2', item: null, name: 'Artifact 2' },
-      { type: 'artifact3', item: null, name: 'Artifact 3' },
-      { type: 'vanity1', item: null, name: 'Vanity 1' },
-      { type: 'vanity2', item: null, name: 'Vanity 2' },
-      { type: 'vanity3', item: null, name: 'Vanity 3' },
-      { type: 'vanity4', item: null, name: 'Vanity 4' },
     ];
 
     // Инициализация хотбара с бесконечными предметами

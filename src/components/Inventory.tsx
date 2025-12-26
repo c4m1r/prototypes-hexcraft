@@ -1,14 +1,14 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { Item, InventorySlot, EquipmentSlot as EquipmentSlotType, Player } from '../types/game';
+import React, { useState, useEffect, useCallback, memo } from 'react';
+import { Item, InventorySlot, EquipmentSlot as EquipmentSlotType, PlayerState } from '../types/game';
 import { useLanguage } from '../contexts/LanguageContext';
 
 interface InventoryProps {
   isOpen: boolean;
   onClose: () => void;
-  playerState: any; // TODO: типизировать
+  playerState: PlayerState;
   onInventoryChange: (inventory: InventorySlot[]) => void;
   onHotbarChange: (hotbar: InventorySlot[]) => void;
-  onEquipmentChange: (equipment: EquipmentSlot[]) => void;
+  onEquipmentChange?: (equipment: EquipmentSlotType[]) => void; // Optional since not used
   onItemPickup?: (item: Item) => void;
 }
 
@@ -29,13 +29,13 @@ const Inventory: React.FC<InventoryProps> = ({
   const [draggedItem, setDraggedItem] = useState<{ item: Item; count: number; fromSlot: number; fromType: 'inventory' | 'hotbar' } | null>(null);
   const [dragOverSlot, setDragOverSlot] = useState<number | null>(null);
   const [tooltip, setTooltip] = useState<{ item: Item; x: number; y: number } | null>(null);
-  // Только текущий игрок (в будущем можно добавить реальных игроков)
-  const [players] = useState<Player[]>([
-    { id: '1', name: playerState?.name || 'Player', position: { x: 0, y: 0, z: 0 }, isOnline: true }
-  ]);
+  // TODO: Реализовать систему игроков в будущем
+  // const [players] = useState<Player[]>([
+  //   { id: '1', name: playerState?.name || 'Player', position: { x: 0, y: 0, z: 0 }, isOnline: true }
+  // ]);
 
   // Функция для расчета позиций гексагонов в honeycomb паттерне
-  const calculateHexagonPositions = (totalHexagons: number, hexagonsPerRow: number) => {
+  const calculateHexagonPositions = useCallback((totalHexagons: number, hexagonsPerRow: number) => {
     const positions: { row: number; col: number; x: number; y: number }[] = [];
     const hexWidth = 50;
     const hexHeight = 43;
@@ -55,7 +55,7 @@ const Inventory: React.FC<InventoryProps> = ({
     }
 
     return positions;
-  };
+  }, []);
 
   // Инициализация инвентаря если не существует
   useEffect(() => {
@@ -121,6 +121,15 @@ const Inventory: React.FC<InventoryProps> = ({
         className={`hexagon-slot ${isDragOver ? 'drag-over' : ''} ${isDraggedFrom ? 'dragged-from' : ''}`}
         onClick={(e) => onClick(e, index, type)}
         onContextMenu={(e) => onClick(e, index, type)}
+        role="button"
+        tabIndex={0}
+        aria-label={`Slot ${index + 1}${slot.item ? `: ${slot.item.name} (${slot.count})` : ': Empty'}`}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            onClick(e as any, index, type);
+          }
+        }}
         onMouseEnter={(e) => {
           if (slot.item) {
             const rect = e.currentTarget.getBoundingClientRect();
@@ -145,7 +154,7 @@ const Inventory: React.FC<InventoryProps> = ({
           }
         }}
         draggable={!!slot.item}
-        onDragStart={(e) => {
+        onDragStart={(_e) => {
           if (slot.item) {
             setDraggedItem({ item: slot.item, count: slot.count, fromSlot: index, fromType: type });
           }
@@ -257,7 +266,19 @@ const Inventory: React.FC<InventoryProps> = ({
     onClick: () => void;
   }> = ({ slot, onClick }) => {
     return (
-      <div className="equipment-slot" onClick={onClick}>
+      <div
+        className="equipment-slot"
+        onClick={onClick}
+        role="button"
+        tabIndex={0}
+        aria-label={`${slot.name}${slot.item ? `: ${slot.item.name}` : ': Empty'}`}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            onClick();
+          }
+        }}
+      >
         <div className="equipment-slot-content">
           {slot.item && (
             <div
@@ -272,40 +293,29 @@ const Inventory: React.FC<InventoryProps> = ({
   };
 
   return (
-    <div className="inventory-overlay" onClick={onClose}>
+    <div className="inventory-overlay" onClick={onClose} role="dialog" aria-modal="true" aria-labelledby="inventory-title">
       <div className="inventory-container" onClick={(e) => e.stopPropagation()}>
         {/* Заголовок */}
         <div className="inventory-header">
-          <h2>Inventory</h2>
+          <h2 id="inventory-title">Inventory</h2>
           <div className="inventory-help">
             <small>Right-click to split stack • Drag & drop to move items</small>
           </div>
-          <button className="close-button" onClick={onClose}>×</button>
+          <button
+            className="close-button"
+            onClick={onClose}
+            aria-label="Close inventory"
+            type="button"
+          >
+            ×
+          </button>
         </div>
 
         <div className="inventory-content">
-          {/* Список игроков */}
-          <div className="players-panel">
-            <h3>{t.inventory.playersOnline}</h3>
-            <div className="players-list">
-              {players.map(player => (
-                <div key={player.id} className={`player-item ${player.isOnline ? 'online' : 'offline'}`}>
-                  <div className="player-avatar">
-                    {player.name.charAt(0).toUpperCase()}
-                  </div>
-                  <div className="player-info">
-                    <div className="player-name">{player.name}</div>
-                    <div className="player-status">
-                      {player.isOnline ? 'Online' : 'Offline'}
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
 
           {/* Персонаж и экипировка */}
-          <div className="character-equipment-panel">
+          <div className="character-equipment-panel" role="region" aria-labelledby="character-heading">
+            <h3 id="character-heading" className="sr-only">Character Equipment</h3>
             {/* Левая экипировка - функциональная броня */}
             <div className="equipment-panel armor-panel">
               <div className="equipment-column">
@@ -342,9 +352,31 @@ const Inventory: React.FC<InventoryProps> = ({
                 </div>
               </div>
               <div className="character-name">{playerState?.name || 'Player'}</div>
+            </div>
 
-              {/* Аксессуары по центру под персонажем */}
-              <div className="accessories-row">
+            {/* Правая экипировка - косметика и аксессуары */}
+            <div className="equipment-panel vanity-accessories-panel">
+              <div className="equipment-column">
+                {/* Косметическая одежда */}
+                <EquipmentSlot
+                  slot={playerState.equipment?.[5] || { type: 'head', item: null, name: t.inventory.head }}
+                  onClick={() => {}}
+                />
+                <EquipmentSlot
+                  slot={playerState.equipment?.[6] || { type: 'chest', item: null, name: t.inventory.chest }}
+                  onClick={() => {}}
+                />
+                <EquipmentSlot
+                  slot={playerState.equipment?.[7] || { type: 'legs', item: null, name: t.inventory.legs }}
+                  onClick={() => {}}
+                />
+                <EquipmentSlot
+                  slot={playerState.equipment?.[8] || { type: 'cape_vanity', item: null, name: t.inventory.cape_vanity }}
+                  onClick={() => {}}
+                />
+
+                {/* Аксессуары */}
+                <div className="equipment-spacer"></div>
                 <EquipmentSlot
                   slot={playerState.equipment?.[9] || { type: 'amulet', item: null, name: t.inventory.amulet }}
                   onClick={() => {}}
@@ -363,28 +395,6 @@ const Inventory: React.FC<InventoryProps> = ({
                 />
                 <EquipmentSlot
                   slot={playerState.equipment?.[13] || { type: 'artifact2', item: null, name: t.inventory.artifact2 }}
-                  onClick={() => {}}
-                />
-              </div>
-            </div>
-
-            {/* Правая экипировка - косметическая одежда (vanity) */}
-            <div className="equipment-panel vanity-panel">
-              <div className="equipment-column">
-                <EquipmentSlot
-                  slot={playerState.equipment?.[5] || { type: 'head', item: null, name: t.inventory.head }}
-                  onClick={() => {}}
-                />
-                <EquipmentSlot
-                  slot={playerState.equipment?.[6] || { type: 'chest', item: null, name: t.inventory.chest }}
-                  onClick={() => {}}
-                />
-                <EquipmentSlot
-                  slot={playerState.equipment?.[7] || { type: 'legs', item: null, name: t.inventory.legs }}
-                  onClick={() => {}}
-                />
-                <EquipmentSlot
-                  slot={playerState.equipment?.[8] || { type: 'cape_vanity', item: null, name: t.inventory.cape_vanity }}
                   onClick={() => {}}
                 />
               </div>
@@ -474,4 +484,5 @@ const Inventory: React.FC<InventoryProps> = ({
   );
 };
 
-export default Inventory;
+export default memo(Inventory);
+

@@ -4,6 +4,7 @@ import { ChunkGenerator } from './ChunkGenerator';
 import { hexToWorld, getChunkKey, worldToChunk, createHexGeometry, createHexGeometryWithUV, worldToHex, HEX_HEIGHT } from '../utils/hexUtils';
 import { GameSettings, DEFAULT_SETTINGS, RenderingMode } from '../types/settings';
 import { TextureManager } from './TextureManager';
+import { InstancedMeshPool, globalMatrixPool } from '../utils/ObjectPool';
 
 interface ChunkMeshData {
   mesh: THREE.InstancedMesh;
@@ -32,9 +33,10 @@ export class World {
   private emergencyAttempts: number = 0;
   private stopEmergencyLogs: boolean = false;
   private fallbackInjected: boolean = false;
-  private renderingMode: RenderingMode = 'prototype';
+  private renderingMode: RenderingMode = 'modern';
   private textureManager: TextureManager | null = null;
   private animationTime: number = 0;
+  private instancedMeshPool: InstancedMeshPool | null = null;
   
   // Система очереди генерации чанков
   private chunkGenerationQueue: Array<{ q: number; r: number; priority: number }> = [];
@@ -86,6 +88,14 @@ export class World {
       this.initializeMaterials();
     }
 
+    // Initialize object pool for InstancedMesh objects
+    this.instancedMeshPool = new InstancedMeshPool(
+      this.blockGeometry,
+      new THREE.MeshLambertMaterial({ color: 0xffffff }),
+      1000, // max instances per mesh
+      50    // max pool size
+    );
+
     this.createFogBarrier();
     this.updateFogDensity();
   }
@@ -95,6 +105,44 @@ export class World {
 
     this.renderingMode = mode;
     console.log(`[World] Switching to ${mode} rendering mode`);
+
+    // Инициализируем textureManager если нужно для modern режима
+    if (mode === 'modern' && !this.textureManager) {
+      this.blockGeometry = createHexGeometryWithUV();
+      this.textureManager = new TextureManager({
+        atlasSize: 320,
+        tileSize: 32,
+        rows: 4,
+        cols: 10
+      });
+      // Загружаем текстуру асинхронно
+      const texturePath = new URL('./texutres.png', import.meta.url).href;
+      this.textureManager.loadAtlas(texturePath).then(() => {
+        this.initializeMaterials();
+        // Пересоздаем все видимые меши с новыми материалами
+        for (const [key, chunk] of this.chunks) {
+          this.removeChunkMeshes(key);
+          this.createChunkMeshes(chunk);
+        }
+      }).catch(err => {
+        console.error('[World] Ошибка загрузки текстур при переключении:', err);
+        // Откатываемся на prototype режим
+        this.renderingMode = 'prototype';
+        this.initializeMaterials();
+        for (const [key, chunk] of this.chunks) {
+          this.removeChunkMeshes(key);
+          this.createChunkMeshes(chunk);
+        }
+      });
+      return; // Выходим, так как инициализация асинхронная
+    }
+
+    // Меняем геометрию если нужно
+    if (mode === 'modern' && !this.blockGeometry.userData.uv) {
+      this.blockGeometry = createHexGeometryWithUV();
+    } else if (mode === 'prototype' && this.blockGeometry.userData.uv) {
+      this.blockGeometry = createHexGeometry();
+    }
 
     // Переинициализируем материалы для нового режима
     this.initializeMaterials();
@@ -390,7 +438,7 @@ export class World {
         break;
       }
       
-      let material = this.materials.get(type);
+      const material = this.materials.get(type);
       if (!material) continue;
 
       // TODO: для modern режима заменить материалы на текстурные,
@@ -399,10 +447,15 @@ export class World {
         // пока используем существующие цветные материалы как fallback
       }
 
-      const mesh = new THREE.InstancedMesh(this.blockGeometry, material, blocks.length);
+      // Use pooled InstancedMesh for better performance
+      const mesh = this.instancedMeshPool!.get();
+      mesh.geometry = this.blockGeometry;
+      mesh.material = material;
+      mesh.count = blocks.length;
       // Инстансы расположены далеко от (0,0,0), без этого boundingSphere отсечет их.
       mesh.frustumCulled = false;
-      const matrix = new THREE.Matrix4();
+
+      const matrix = globalMatrixPool.get();
 
       // Обрабатываем все блоки этого типа, но проверяем время выполнения
       for (let index = 0; index < blocks.length; index++) {
@@ -413,6 +466,9 @@ export class World {
       }
 
       mesh.instanceMatrix.needsUpdate = true;
+
+      // Return matrix to pool
+      globalMatrixPool.release(matrix);
 
       mesh.userData = {
         chunkKey: key,
@@ -580,7 +636,6 @@ export class World {
   }
 
   getBiomeAt(x: number, z: number): string | null {
-    const hex = worldToHex(x, z);
     const chunkPos = worldToChunk(x, z, this.chunkSize);
     const key = getChunkKey(chunkPos.q, chunkPos.r);
     const chunk = this.chunks.get(key);
@@ -705,7 +760,8 @@ export class World {
     if (meshMap) {
       meshMap.forEach(({ mesh }) => {
         this.scene.remove(mesh);
-        mesh.dispose();
+        // Return mesh to pool instead of disposing
+        this.instancedMeshPool!.release(mesh);
       });
       this.chunkMeshes.delete(key);
     }
