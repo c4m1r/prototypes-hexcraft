@@ -4,9 +4,10 @@ import * as THREE from 'three';
 export const HEX_SIZE = 1;
 export const HEX_WIDTH = Math.sqrt(3) * HEX_SIZE; // Ширина гексагона = √3 * size
 export const HEX_HEIGHT = HEX_WIDTH; // Высота = ширине для квадратного вида
-// Радиус описанной окружности гексагона должен быть равен половине расстояния между центрами
-// Расстояние между центрами = sqrt(3) * HEX_SIZE, поэтому радиус = sqrt(3) / 2 * HEX_SIZE
-export const HEX_RADIUS = (Math.sqrt(3) / 2) * HEX_SIZE; // Радиус для правильного соприкосновения гранями
+// Для правильного соприкосновения гранями используем радиус вписанной окружности (inradius)
+// Расстояние между центрами = sqrt(3) * HEX_SIZE = диаметр вписанной окружности
+// Поэтому радиус геометрии = sqrt(3) / 2 * HEX_SIZE
+export const HEX_RADIUS = (Math.sqrt(3) / 2) * HEX_SIZE;
 
 export interface HexCoords {
   q: number;
@@ -16,6 +17,7 @@ export interface HexCoords {
 
 export function hexToWorld(q: number, r: number, y: number = 0): THREE.Vector3 {
   // Для pointy-top ориентации (остриями вверх):
+  // Стандартная формула для гексагональной сетки
   // x = size * √3 * (q + r/2)
   // z = size * 1.5 * r
   const x = HEX_SIZE * Math.sqrt(3) * (q + r / 2);
