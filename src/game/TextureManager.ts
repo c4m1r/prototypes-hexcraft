@@ -257,7 +257,8 @@ export class TextureManager {
         transparent: shouldBeTransparent,
         opacity: config.opacity !== undefined ? config.opacity : 1,
         side: THREE.DoubleSide, // Всегда DoubleSide для правильного отображения с обеих сторон
-        alphaTest: shouldBeTransparent ? 0.1 : 1.0 // Для непрозрачных блоков игнорируем альфа-канал (alphaTest > 0.99)
+        alphaTest: shouldBeTransparent ? 0.1 : 0.99, // Для непрозрачных блоков игнорируем альфа-канал
+        color: 0xffffff // Явно задаем белый цвет как базу для текстуры
       });
 
       material.topTexture = sideTexture; // Используем side как fallback

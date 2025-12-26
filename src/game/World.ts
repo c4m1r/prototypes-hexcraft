@@ -33,7 +33,7 @@ export class World {
   private emergencyAttempts: number = 0;
   private stopEmergencyLogs: boolean = false;
   private fallbackInjected: boolean = false;
-  private renderingMode: RenderingMode = 'modern';
+  private useTextures: boolean = true;
   private textureManager: TextureManager | null = null;
   private animationTime: number = 0;
   private instancedMeshPool: InstancedMeshPool | null = null;
@@ -49,7 +49,7 @@ export class World {
     this.maxLoadedChunks = finalSettings.maxLoadedChunks;
     this.renderDistance = finalSettings.renderDistance;
     this.fogDensity = finalSettings.fogDensity;
-    this.renderingMode = finalSettings.renderingMode;
+    this.useTextures = finalSettings.renderingMode === 'modern';
 
     // Чтобы избежать постоянного удаления/добавления чанков, гарантируем,
     // что лимит загруженных чанков покрывает радиус видимости.
@@ -66,27 +66,26 @@ export class World {
     this.generator = new ChunkGenerator(this.chunkSize, worldSeed);
     this.generatorSeed = this.generator.getSeed();
 
-    if (this.renderingMode === 'modern') {
-      this.blockGeometry = createHexGeometryWithUV();
-      this.textureManager = new TextureManager({
-        atlasSize: 320,
-        tileSize: 32,
-        rows: 4,
-        cols: 10
-      });
-      // Загружаем текстуру (путь будет обработан Vite)
-      const texturePath = new URL('./texutres.png', import.meta.url).href;
-      this.textureManager.loadAtlas(texturePath).then(() => {
-        this.initializeMaterials();
-      }).catch(err => {
-        console.error('[World] Ошибка загрузки текстур:', err);
-        this.renderingMode = 'prototype';
-        this.initializeMaterials();
-      });
-    } else {
-      this.blockGeometry = createHexGeometry();
+    // Всегда используем UV геометрию для поддержки текстур
+    this.blockGeometry = createHexGeometryWithUV();
+
+    // Пытаемся загрузить текстуры
+    this.textureManager = new TextureManager({
+      atlasSize: 320,
+      tileSize: 32,
+      rows: 4,
+      cols: 10
+    });
+
+    const texturePath = new URL('./texutres.png', import.meta.url).href;
+    this.textureManager.loadAtlas(texturePath).then(() => {
+      console.log('[World] Textures loaded successfully');
       this.initializeMaterials();
-    }
+    }).catch(err => {
+      console.warn('[World] Failed to load textures, using colors:', err);
+      this.useTextures = false;
+      this.initializeMaterials();
+    });
 
     // Initialize object pool for InstancedMesh objects
     this.instancedMeshPool = new InstancedMeshPool(
@@ -101,48 +100,19 @@ export class World {
   }
 
   setRenderingMode(mode: RenderingMode): void {
-    if (this.renderingMode === mode) return;
+    const shouldUseTextures = mode === 'modern';
 
-    this.renderingMode = mode;
-    console.log(`[World] Switching to ${mode} rendering mode`);
+    if (this.useTextures === shouldUseTextures) return;
 
-    // Инициализируем textureManager если нужно для modern режима
-    if (mode === 'modern' && !this.textureManager) {
-      this.blockGeometry = createHexGeometryWithUV();
-      this.textureManager = new TextureManager({
-        atlasSize: 320,
-        tileSize: 32,
-        rows: 4,
-        cols: 10
-      });
-      // Загружаем текстуру асинхронно
-      const texturePath = new URL('./texutres.png', import.meta.url).href;
-      this.textureManager.loadAtlas(texturePath).then(() => {
-        this.initializeMaterials();
-        // Пересоздаем все видимые меши с новыми материалами
-        for (const [key, chunk] of this.chunks) {
-          this.removeChunkMeshes(key);
-          this.createChunkMeshes(chunk);
-        }
-      }).catch(err => {
-        console.error('[World] Ошибка загрузки текстур при переключении:', err);
-        // Откатываемся на prototype режим
-        this.renderingMode = 'prototype';
-        this.initializeMaterials();
-        for (const [key, chunk] of this.chunks) {
-          this.removeChunkMeshes(key);
-          this.createChunkMeshes(chunk);
-        }
-      });
-      return; // Выходим, так как инициализация асинхронная
+    console.log(`[World] Switching rendering mode to ${mode}`);
+
+    // Если текстуры не загружены и пытаемся переключиться на modern, ничего не делаем
+    if (shouldUseTextures && !this.textureManager) {
+      console.warn('[World] Cannot switch to modern mode - textures not loaded');
+      return;
     }
 
-    // Меняем геометрию если нужно
-    if (mode === 'modern' && !this.blockGeometry.userData.uv) {
-      this.blockGeometry = createHexGeometryWithUV();
-    } else if (mode === 'prototype' && this.blockGeometry.userData.uv) {
-      this.blockGeometry = createHexGeometry();
-    }
+    this.useTextures = shouldUseTextures;
 
     // Переинициализируем материалы для нового режима
     this.initializeMaterials();
@@ -156,42 +126,36 @@ export class World {
 
   private initializeMaterials(): void {
     BLOCK_TYPES.forEach(blockType => {
-      if (this.renderingMode === 'modern' && this.textureManager) {
+      // Пытаемся использовать текстуры если они доступны и включены
+      if (this.useTextures && this.textureManager) {
         const material = this.textureManager.createMaterial(blockType.id, this.animationTime, blockType.color);
         if (material) {
           this.materials.set(blockType.id, material);
-        } else {
-          // Fallback на фиолетовый материал (error debug) для блоков без текстуры в атласе
-          this.materials.set(
-            blockType.id,
-            new THREE.MeshLambertMaterial({
-              color: 0xff00ff, // Фиолетовый цвет для блоков без текстуры
-              side: THREE.DoubleSide
-            })
-          );
+          return; // Успешно использовали текстуру
         }
-      } else {
-        const isLeaves = blockType.id === 'leaves';
-        const isWater = blockType.id === 'water';
-        const isIce = blockType.id === 'ice';
-        
-        // Вода и лед должны быть прозрачными
-        const isTransparent = isLeaves || isWater || isIce;
-        let opacity = 1;
-        if (isLeaves) opacity = 0.75;
-        else if (isWater) opacity = 0.7;
-        else if (isIce) opacity = 0.9;
-        
-        this.materials.set(
-          blockType.id,
-          new THREE.MeshLambertMaterial({
-            color: blockType.color,
-            transparent: isTransparent,
-            opacity: opacity,
-            side: (isLeaves || isWater || isIce) ? THREE.DoubleSide : THREE.FrontSide
-          })
-        );
       }
+
+      // Fallback на цвета (как в prototype режиме)
+      const isLeaves = blockType.id === 'leaves';
+      const isWater = blockType.id === 'water';
+      const isIce = blockType.id === 'ice';
+
+      // Вода и лед должны быть прозрачными
+      const isTransparent = isLeaves || isWater || isIce;
+      let opacity = 1;
+      if (isLeaves) opacity = 0.75;
+      else if (isWater) opacity = 0.7;
+      else if (isIce) opacity = 0.9;
+
+      this.materials.set(
+        blockType.id,
+        new THREE.MeshLambertMaterial({
+          color: blockType.color,
+          transparent: isTransparent,
+          opacity: opacity,
+          side: THREE.DoubleSide // Всегда DoubleSide для консистентности
+        })
+      );
     });
   }
 
