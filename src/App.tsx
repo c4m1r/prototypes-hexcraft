@@ -198,7 +198,6 @@ function App() {
     // Объединяем настройки мира с текущими настройками игры
     const mergedSettings: GameSettings = {
       ...settingsRef.current,
-      renderingMode: worldSetup.renderingMode,
       seed: worldSetup.seed
     };
     settingsRef.current = mergedSettings;

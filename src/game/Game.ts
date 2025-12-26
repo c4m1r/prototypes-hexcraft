@@ -54,7 +54,6 @@ export class Game {
   private droppedItems: DroppedItem[] = [];
   private nextItemId: number = 0;
   private droppedItemMeshes: Map<string, THREE.Mesh> = new Map();
-  private renderingMode: 'prototype' | 'modern' = 'prototype';
   private savedFogDensity: number = 1;
 
   private initializeInventory() {

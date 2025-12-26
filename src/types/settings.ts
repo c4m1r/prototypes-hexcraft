@@ -1,6 +1,6 @@
 import { Language } from '../utils/i18n';
 
-export type RenderingMode = 'prototype' | 'modern';
+export type RenderingMode = 'prototype' | 'modern'; // Используется только для переключения текстур (F2)
 export type GameMode = 'Solo' | 'Co-op' | 'Online';
 
 export interface GameSettings {
@@ -9,7 +9,6 @@ export interface GameSettings {
   biomeSize: number;
   chunkSize: number;
   maxLoadedChunks: number;
-  renderingMode: RenderingMode;
   seed: number;
   language: Language;
 }
@@ -18,7 +17,6 @@ export interface WorldSetup {
   playerName: string;
   gameMode: GameMode;
   seed: number;
-  renderingMode: RenderingMode;
 }
 
 export const DEFAULT_SETTINGS: GameSettings = {
@@ -27,7 +25,6 @@ export const DEFAULT_SETTINGS: GameSettings = {
   biomeSize: 1,
   chunkSize: 14,
   maxLoadedChunks: 15,
-  renderingMode: 'modern',
   seed: Math.floor(Math.random() * 1_000_000_000),
   language: 'ru'
 };

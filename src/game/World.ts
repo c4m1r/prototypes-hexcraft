@@ -1,8 +1,8 @@
 import * as THREE from 'three';
 import { Chunk, Block, BLOCK_TYPES } from '../types/game';
 import { ChunkGenerator } from './ChunkGenerator';
-import { hexToWorld, getChunkKey, worldToChunk, createHexGeometry, createHexGeometryWithUV, worldToHex, HEX_HEIGHT } from '../utils/hexUtils';
-import { GameSettings, DEFAULT_SETTINGS, RenderingMode } from '../types/settings';
+import { hexToWorld, getChunkKey, worldToChunk, createHexGeometryWithUV, worldToHex, HEX_HEIGHT } from '../utils/hexUtils';
+import { GameSettings, DEFAULT_SETTINGS } from '../types/settings';
 import { TextureManager } from './TextureManager';
 import { InstancedMeshPool, globalMatrixPool } from '../utils/ObjectPool';
 
@@ -49,8 +49,8 @@ export class World {
     this.maxLoadedChunks = finalSettings.maxLoadedChunks;
     this.renderDistance = finalSettings.renderDistance;
     this.fogDensity = finalSettings.fogDensity;
-    // Используем текстуры если они включены в настройках
-    this.useTextures = finalSettings.renderingMode === 'modern';
+    // По умолчанию текстуры включены (автоматически при старте)
+    this.useTextures = true;
 
     // Чтобы избежать постоянного удаления/добавления чанков, гарантируем,
     // что лимит загруженных чанков покрывает радиус видимости.
@@ -67,10 +67,10 @@ export class World {
     this.generator = new ChunkGenerator(this.chunkSize, worldSeed);
     this.generatorSeed = this.generator.getSeed();
 
-    // Начинаем с обычной геометрии
-    this.blockGeometry = createHexGeometry();
+    // Всегда используем UV геометрию для поддержки текстур (Prototype рендер)
+    this.blockGeometry = createHexGeometryWithUV();
 
-    // Загружаем texture manager для анимированных текстур
+    // Загружаем texture manager для работы с текстурами
     this.textureManager = new TextureManager({
       atlasSize: 320,
       tileSize: 32,
@@ -81,14 +81,11 @@ export class World {
     const texturePath = new URL('./texutres.png', import.meta.url).href;
     this.textureManager.loadAtlas(texturePath).then(() => {
       console.log('[World] Textures loaded successfully');
-      // Если текстуры нужны, переключаемся на UV геометрию
-      if (this.useTextures) {
-        this.blockGeometry = createHexGeometryWithUV();
-      }
+      // Текстуры загружены, инициализируем материалы
       this.initializeMaterials();
     }).catch(err => {
       console.warn('[World] Failed to load textures:', err);
-      // Отключаем текстуры если не загрузились
+      // Отключаем текстуры если не загрузились, используем цвета
       this.useTextures = false;
       this.initializeMaterials();
     });
@@ -105,27 +102,21 @@ export class World {
     this.updateFogDensity();
   }
 
-  setRenderingMode(mode: RenderingMode): void {
+  setRenderingMode(mode: 'prototype' | 'modern'): void {
+    // Режим 'modern' = текстуры включены, 'prototype' = текстуры выключены (цвета)
     const shouldUseTextures = mode === 'modern';
 
     if (this.useTextures === shouldUseTextures) return;
 
-    console.log(`[World] Switching to ${mode} rendering mode`);
+    console.log(`[World] Switching texture mode: ${shouldUseTextures ? 'textures ON' : 'colors ON'}`);
 
-    // Если текстуры не загружены и пытаемся переключиться на modern, ничего не делаем
-    if (shouldUseTextures && !this.textureManager) {
-      console.warn('[World] Cannot switch to modern mode - textures not loaded');
+    // Если текстуры не загружены и пытаемся включить их, ничего не делаем
+    if (shouldUseTextures && !this.textureManager?.atlasTexture) {
+      console.warn('[World] Cannot enable textures - textures not loaded');
       return;
     }
 
     this.useTextures = shouldUseTextures;
-
-    // Меняем геометрию если нужно
-    if (shouldUseTextures && !this.blockGeometry.userData.uv) {
-      this.blockGeometry = createHexGeometryWithUV();
-    } else if (!shouldUseTextures && this.blockGeometry.userData.uv) {
-      this.blockGeometry = createHexGeometry();
-    }
 
     // Переинициализируем материалы для нового режима
     this.initializeMaterials();
@@ -243,8 +234,8 @@ export class World {
     this.unloadDistantChunks(playerChunk.q, playerChunk.r);
     this.updateFogBarrier(playerX, playerZ);
 
-    // Обновление анимации текстур для режима Modern
-    if (this.renderingMode === 'modern' && this.textureManager) {
+    // Обновление анимации текстур (если текстуры включены)
+    if (this.useTextures && this.textureManager) {
       this.animationTime += 0.016; // Примерно 60 FPS
       this.textureManager.updateAnimation(0.016);
       this.updateAnimatedMaterials();
@@ -418,11 +409,7 @@ export class World {
       const material = this.materials.get(type);
       if (!material) continue;
 
-      // TODO: для modern режима заменить материалы на текстурные,
-      // когда появятся координаты в атласе texutres.png.
-      if (this.renderingMode === 'modern') {
-        // пока используем существующие цветные материалы как fallback
-      }
+      // Материалы уже настроены в initializeMaterials() в зависимости от useTextures
 
       // Use pooled InstancedMesh for better performance
       const mesh = this.instancedMeshPool!.get();

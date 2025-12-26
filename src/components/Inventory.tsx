@@ -37,8 +37,8 @@ const Inventory: React.FC<InventoryProps> = ({
   // Функция для расчета позиций гексагонов в honeycomb паттерне
   const calculateHexagonPositions = useCallback((totalHexagons: number, hexagonsPerRow: number) => {
     const positions: { row: number; col: number; x: number; y: number }[] = [];
-    const hexWidth = 50;
-    const hexHeight = 43;
+    const hexWidth = 45;
+    const hexHeight = 39;
     const horizontalSpacing = hexWidth * 0.75; // 75% перекрытия для honeycomb
     const verticalSpacing = hexHeight * 0.866; // sin(60°) для вертикального смещения
 
@@ -375,28 +375,30 @@ const Inventory: React.FC<InventoryProps> = ({
                   onClick={() => {}}
                 />
 
-                {/* Аксессуары */}
+                {/* Аксессуары - горизонтально */}
                 <div className="equipment-spacer"></div>
-                <EquipmentSlot
-                  slot={playerState.equipment?.[9] || { type: 'amulet', item: null, name: t.inventory.amulet }}
-                  onClick={() => {}}
-                />
-                <EquipmentSlot
-                  slot={playerState.equipment?.[10] || { type: 'ring1', item: null, name: t.inventory.ring1 }}
-                  onClick={() => {}}
-                />
-                <EquipmentSlot
-                  slot={playerState.equipment?.[11] || { type: 'ring2', item: null, name: t.inventory.ring2 }}
-                  onClick={() => {}}
-                />
-                <EquipmentSlot
-                  slot={playerState.equipment?.[12] || { type: 'artifact1', item: null, name: t.inventory.artifact1 }}
-                  onClick={() => {}}
-                />
-                <EquipmentSlot
-                  slot={playerState.equipment?.[13] || { type: 'artifact2', item: null, name: t.inventory.artifact2 }}
-                  onClick={() => {}}
-                />
+                <div className="accessories-row">
+                  <EquipmentSlot
+                    slot={playerState.equipment?.[9] || { type: 'amulet', item: null, name: t.inventory.amulet }}
+                    onClick={() => {}}
+                  />
+                  <EquipmentSlot
+                    slot={playerState.equipment?.[10] || { type: 'ring1', item: null, name: t.inventory.ring1 }}
+                    onClick={() => {}}
+                  />
+                  <EquipmentSlot
+                    slot={playerState.equipment?.[11] || { type: 'ring2', item: null, name: t.inventory.ring2 }}
+                    onClick={() => {}}
+                  />
+                  <EquipmentSlot
+                    slot={playerState.equipment?.[12] || { type: 'artifact1', item: null, name: t.inventory.artifact1 }}
+                    onClick={() => {}}
+                  />
+                  <EquipmentSlot
+                    slot={playerState.equipment?.[13] || { type: 'artifact2', item: null, name: t.inventory.artifact2 }}
+                    onClick={() => {}}
+                  />
+                </div>
               </div>
             </div>
           </div>

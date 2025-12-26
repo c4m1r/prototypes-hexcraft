@@ -199,6 +199,8 @@ export class TextureManager {
     );
     texture.magFilter = THREE.NearestFilter;
     texture.minFilter = THREE.NearestFilter;
+    texture.wrapS = THREE.ClampToEdgeWrapping;
+    texture.wrapT = THREE.ClampToEdgeWrapping;
     texture.needsUpdate = true;
 
     return texture;
@@ -257,7 +259,7 @@ export class TextureManager {
         transparent: shouldBeTransparent,
         opacity: config.opacity !== undefined ? config.opacity : 1,
         side: THREE.DoubleSide, // Всегда DoubleSide для правильного отображения с обеих сторон
-        alphaTest: shouldBeTransparent ? 0.1 : 0.99, // Для непрозрачных блоков игнорируем альфа-канал
+        alphaTest: shouldBeTransparent ? 0.1 : 0.0, // Для непрозрачных блоков не используем alphaTest
         color: 0xffffff // Явно задаем белый цвет как базу для текстуры
       });
 
@@ -317,6 +319,9 @@ export class TextureManager {
         float finalAlpha = color.a;
         if (opacity < 1.0) {
           finalAlpha = color.a * opacity;
+        } else {
+          // Для непрозрачных блоков принудительно устанавливаем альфа = 1.0
+          finalAlpha = 1.0;
         }
         
         gl_FragColor = vec4(color.rgb, finalAlpha);
@@ -336,7 +341,7 @@ export class TextureManager {
       fragmentShader,
       transparent: transparent,
       side: THREE.DoubleSide, // Всегда DoubleSide для правильного отображения с обеих сторон
-      alphaTest: transparent ? 0.1 : 1.0 // Для непрозрачных блоков игнорируем альфа-канал (alphaTest > 0.99)
+      alphaTest: transparent ? 0.1 : 0.0 // Для непрозрачных блоков не используем alphaTest
     });
 
     return material;

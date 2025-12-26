@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { RenderingMode, GameMode, WorldSetup, DEFAULT_SETTINGS } from '../types/settings';
+import { GameMode, WorldSetup } from '../types/settings';
 import { useLanguage } from '../contexts/LanguageContext';
 
 interface WorldSetupMenuProps {
@@ -12,7 +12,6 @@ export function WorldSetupMenu({ onStart, onBack }: WorldSetupMenuProps) {
   const [playerName, setPlayerName] = useState<string>('');
   const [gameMode, setGameMode] = useState<GameMode>('Solo');
   const [seed, setSeed] = useState<string>('');
-  const [renderingMode, setRenderingMode] = useState<RenderingMode>(DEFAULT_SETTINGS.renderingMode);
 
   // Генерируем случайный seed при первом рендере
   useEffect(() => {
@@ -53,8 +52,7 @@ export function WorldSetupMenu({ onStart, onBack }: WorldSetupMenuProps) {
     onStart({
       playerName: playerName.trim() || t.worldSetup.playerNamePlaceholder,
       gameMode,
-      seed: finalSeed,
-      renderingMode
+      seed: finalSeed
     });
   };
 
@@ -96,25 +94,6 @@ export function WorldSetupMenu({ onStart, onBack }: WorldSetupMenuProps) {
                 {gameMode === 'Solo' && t.worldSetup.gameModeSoloDesc}
                 {gameMode === 'Co-op' && t.worldSetup.gameModeCoopDesc}
                 {gameMode === 'Online' && t.worldSetup.gameModeOnlineDesc}
-              </div>
-            </label>
-          </div>
-
-          {/* Rendering Mode */}
-          <div className="bg-gray-900 p-6 rounded-lg border border-white/20">
-            <label className="block mb-2">
-              <div className="text-lg font-semibold mb-2 text-white">{t.worldSetup.renderingMode}</div>
-              <select
-                value={renderingMode}
-                onChange={(e) => setRenderingMode(e.target.value as RenderingMode)}
-                className="w-full bg-gray-800 border border-white/20 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-white/40"
-              >
-                <option value="prototype">{t.worldSetup.renderingModePrototype}</option>
-                <option value="modern">{t.worldSetup.renderingModeModern}</option>
-              </select>
-              <div className="text-sm text-gray-400 mt-2">
-                {renderingMode === 'prototype' && t.worldSetup.renderingModePrototypeDesc}
-                {renderingMode === 'modern' && t.worldSetup.renderingModeModernDesc}
               </div>
             </label>
           </div>
