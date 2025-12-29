@@ -255,23 +255,37 @@ export class TextureManager {
     // Проверяем, нужно ли использовать разные текстуры для top и side
     const hasTopTexture = config.top.row !== undefined && config.top.col !== undefined;
     const texturesDifferent = hasTopTexture && (config.top.row !== config.side.row || config.top.col !== config.side.col);
-    const useCustomShader = texturesDifferent;
     
     // Включаем прозрачность только если она явно задана в конфиге
     // Для leaves, water, ice, lava всегда включаем прозрачность
     // Для остальных блоков прозрачность определяется только конфигом
     const shouldBeTransparent = (config.transparent === true) || blockId === 'leaves' || blockId === 'water' || blockId === 'ice' || blockId === 'lava';
     
-    if (useCustomShader) {
-      // Для блоков с разными текстурами top и side используем кастомный шейдер
+    // Для grass блоков используем стандартный материал с атласом текстур
+    // Геометрия будет создана отдельно с правильными UV координатами
+    if (blockId === 'grass' && texturesDifferent && this.atlasTexture) {
+      // Используем атлас текстур напрямую для grass блоков
+      // Геометрия будет иметь правильные UV координаты для верхней и боковых граней
+      const material = new THREE.MeshLambertMaterial({
+        map: this.atlasTexture, // Используем весь атлас
+        transparent: false, // Grass не прозрачный
+        opacity: 1.0,
+        side: THREE.DoubleSide,
+        alphaTest: 0.0,
+        color: 0xffffff
+      });
+      
+      console.log('[TextureManager] Grass block using atlas texture with custom UV geometry', {
+        topTexture: `${config.top.row},${config.top.col}`,
+        sideTexture: `${config.side.row},${config.side.col}`
+      });
+      
+      return material;
+    }
+    
+    // Для остальных блоков с разными текстурами используем кастомный шейдер
+    if (texturesDifferent) {
       const material = this.createDualTextureMaterial(topTexture, sideTexture, config, shouldBeTransparent);
-      if (blockId === 'grass') {
-        console.log('[TextureManager] Grass block using dual texture shader', {
-          topTexture: `${config.top.row},${config.top.col}`,
-          sideTexture: `${config.side.row},${config.side.col}`,
-          transparent: shouldBeTransparent
-        });
-      }
       return material;
     } else {
       // Если текстуры одинаковые или top не задан, используем side для всех граней

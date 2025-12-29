@@ -9,7 +9,8 @@ export const HEX_SIZE = 2.2 / Math.sqrt(5.25); // ≈ 0.961
 export const HEX_WIDTH = Math.sqrt(3) * HEX_SIZE; // Ширина гексагона = √3 * size
 export const HEX_HEIGHT = HEX_WIDTH; // Высота = ширине для квадратного вида
 // Используем радиус описанной окружности для соприкосновения гранями
-export const HEX_RADIUS = 1;
+// Уменьшаем радиус на 0.00001 для создания небольшого отступа между блоками
+export const HEX_RADIUS = 1 - 0.00001;
 
 export interface HexCoords {
   q: number;
@@ -151,6 +152,133 @@ export function createHexGeometryWithUV(): THREE.BufferGeometry {
     vertices.push(nextX, -height / 2, nextZ);
     normals.push(Math.cos(nextAngle), 0, Math.sin(nextAngle));
     uvs.push((i + 1) / segments, 0);
+
+    const baseIdx = sideStartIndex + i * 4;
+    indices.push(baseIdx, baseIdx + 1, baseIdx + 2);
+    indices.push(baseIdx + 1, baseIdx + 3, baseIdx + 2);
+  }
+
+  geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
+  geometry.setAttribute('normal', new THREE.Float32BufferAttribute(normals, 3));
+  geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
+  geometry.setIndex(indices);
+  geometry.computeBoundingSphere();
+
+  return geometry;
+}
+
+// Создаёт геометрию для grass блоков с правильными UV координатами для верхней и боковых граней
+// Использует стандартное наложение текстур через UV координаты
+export function createGrassHexGeometryWithUV(
+  topTextureRow: number, 
+  topTextureCol: number, 
+  sideTextureRow: number, 
+  sideTextureCol: number,
+  atlasRows: number = 4,
+  atlasCols: number = 10
+): THREE.BufferGeometry {
+  const geometry = new THREE.BufferGeometry();
+  const vertices: number[] = [];
+  const normals: number[] = [];
+  const uvs: number[] = [];
+  const indices: number[] = [];
+
+  const radius = HEX_RADIUS;
+  const height = HEX_HEIGHT;
+  const segments = 6;
+
+  // Вычисляем UV координаты для текстур в атласе
+  const topUStart = topTextureCol / atlasCols;
+  const topVStart = topTextureRow / atlasRows;
+  const topUEnd = (topTextureCol + 1) / atlasCols;
+  const topVEnd = (topTextureRow + 1) / atlasRows;
+
+  const sideUStart = sideTextureCol / atlasCols;
+  const sideVStart = sideTextureRow / atlasRows;
+  const sideUEnd = (sideTextureCol + 1) / atlasCols;
+  const sideVEnd = (sideTextureRow + 1) / atlasRows;
+
+  // Верхняя грань (верхняя текстура из атласа)
+  const topCenterIndex = vertices.length / 3;
+  vertices.push(0, height / 2, 0);
+  normals.push(0, 1, 0);
+  uvs.push((topUStart + topUEnd) / 2, (topVStart + topVEnd) / 2); // Центр текстуры
+
+  for (let i = 0; i <= segments; i++) {
+    const angle = (i / segments) * Math.PI * 2;
+    const x = Math.cos(angle) * radius;
+    const z = Math.sin(angle) * radius;
+    vertices.push(x, height / 2, z);
+    normals.push(0, 1, 0);
+    // UV для верхней грани - маппинг на topTexture в атласе
+    const uvAngle = (i / segments) * Math.PI * 2;
+    const u = (topUStart + topUEnd) / 2 + Math.cos(uvAngle) * (topUEnd - topUStart) / 2;
+    const v = (topVStart + topVEnd) / 2 + Math.sin(uvAngle) * (topVEnd - topVStart) / 2;
+    uvs.push(u, v);
+  }
+
+  // Индексы для верхней грани
+  for (let i = 0; i < segments; i++) {
+    indices.push(topCenterIndex, topCenterIndex + i + 1, topCenterIndex + i + 2);
+  }
+
+  // Нижняя грань (используем sideTexture)
+  const bottomCenterIndex = vertices.length / 3;
+  vertices.push(0, -height / 2, 0);
+  normals.push(0, -1, 0);
+  uvs.push((sideUStart + sideUEnd) / 2, (sideVStart + sideVEnd) / 2);
+
+  for (let i = 0; i <= segments; i++) {
+    const angle = (i / segments) * Math.PI * 2;
+    const x = Math.cos(angle) * radius;
+    const z = Math.sin(angle) * radius;
+    vertices.push(x, -height / 2, z);
+    normals.push(0, -1, 0);
+    // UV для нижней грани - маппинг на sideTexture в атласе
+    const uvAngle = (i / segments) * Math.PI * 2;
+    const u = (sideUStart + sideUEnd) / 2 + Math.cos(uvAngle) * (sideUEnd - sideUStart) / 2;
+    const v = (sideVStart + sideVEnd) / 2 + Math.sin(uvAngle) * (sideVEnd - sideVStart) / 2;
+    uvs.push(u, v);
+  }
+
+  // Индексы для нижней грани
+  for (let i = 0; i < segments; i++) {
+    indices.push(bottomCenterIndex, bottomCenterIndex + i + 2, bottomCenterIndex + i + 1);
+  }
+
+  // Боковые грани (боковая текстура из атласа)
+  const sideStartIndex = vertices.length / 3;
+  for (let i = 0; i <= segments; i++) {
+    const angle = (i / segments) * Math.PI * 2;
+    const x = Math.cos(angle) * radius;
+    const z = Math.sin(angle) * radius;
+    const nextAngle = ((i + 1) % (segments + 1)) / segments * Math.PI * 2;
+    const nextX = Math.cos(nextAngle) * radius;
+    const nextZ = Math.sin(nextAngle) * radius;
+
+    // Верхние вершины боковой грани
+    vertices.push(x, height / 2, z);
+    normals.push(Math.cos(angle), 0, Math.sin(angle));
+    // UV для боковой грани - маппинг на sideTexture в атласе
+    const u = sideUStart + (i / segments) * (sideUEnd - sideUStart);
+    const v = sideVEnd; // Верх боковой текстуры
+    uvs.push(u, v);
+
+    // Нижние вершины боковой грани
+    vertices.push(x, -height / 2, z);
+    normals.push(Math.cos(angle), 0, Math.sin(angle));
+    uvs.push(u, sideVStart); // Низ боковой текстуры
+
+    // Верхние вершины следующей грани
+    vertices.push(nextX, height / 2, nextZ);
+    normals.push(Math.cos(nextAngle), 0, Math.sin(nextAngle));
+    const nextU = sideUStart + ((i + 1) / segments) * (sideUEnd - sideUStart);
+    uvs.push(nextU, sideVEnd);
+
+    // Нижние вершины следующей грани
+    vertices.push(nextX, -height / 2, nextZ);
+    normals.push(Math.cos(nextAngle), 0, Math.sin(nextAngle));
+    uvs.push(nextU, sideVStart);
 
     const baseIdx = sideStartIndex + i * 4;
     indices.push(baseIdx, baseIdx + 1, baseIdx + 2);
