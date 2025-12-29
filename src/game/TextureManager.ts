@@ -322,11 +322,6 @@ export class TextureManager {
         // Смешиваем текстуры в зависимости от нормали с плавным переходом
         vec4 color = mix(sideColor, topColor, smoothstep(0.7, 1.0, topFactor));
         
-        // Для непрозрачных блоков отбрасываем пиксели с низкой альфой
-        if (!isTransparent && color.a < 0.5) {
-          discard;
-        }
-        
         // Lambert освещение
         vec3 lightDir = normalize(directionalLightDirection);
         float NdotL = max(dot(vWorldNormal, lightDir), 0.0);
