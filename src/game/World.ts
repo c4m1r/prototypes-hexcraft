@@ -18,7 +18,7 @@ export class World {
   private scene: THREE.Scene;
   private chunkSize: number = 14;
   private blockGeometry: THREE.CylinderGeometry;
-  private materials: Map<string, THREE.MeshLambertMaterial> = new Map();
+  private materials: Map<string, THREE.Material> = new Map();
   private maxLoadedChunks: number = 15;
   private fogBarrier: THREE.Mesh | null = null;
   private showFogBarrier: boolean = true;
@@ -37,6 +37,7 @@ export class World {
   private textureManager: TextureManager | null = null;
   private animationTime: number = 0;
   private instancedMeshPool: InstancedMeshPool | null = null;
+  private materialsReady: boolean = false; // Флаг готовности материалов
   
   // Система очереди генерации чанков
   private chunkGenerationQueue: Array<{ q: number; r: number; priority: number }> = [];
@@ -86,11 +87,17 @@ export class World {
       console.log('[World] Textures loaded successfully');
       // Текстуры загружены, инициализируем материалы
       this.initializeMaterials();
+      this.materialsReady = true;
+      // Пересоздаём меши для уже созданных чанков после загрузки материалов
+      this.recreateChunkMeshes();
     }).catch(err => {
       console.warn('[World] Failed to load textures:', err);
       // Отключаем текстуры если не загрузились, используем цвета
       this.useTextures = false;
       this.initializeMaterials();
+      this.materialsReady = true;
+      // Пересоздаём меши для уже созданных чанков после загрузки материалов
+      this.recreateChunkMeshes();
     });
 
     // Initialize object pool for InstancedMesh objects
@@ -103,6 +110,11 @@ export class World {
 
     this.createFogBarrier();
     this.updateFogDensity();
+    
+    // Инициализируем материалы сразу (fallback режим с цветами)
+    // Это гарантирует, что материалы будут готовы даже если текстуры не загрузятся
+    this.initializeMaterials();
+    this.materialsReady = true;
   }
 
   toggleUseTextures(): void {
@@ -111,7 +123,7 @@ export class World {
     console.log(`[World] Switching texture mode: ${shouldUseTextures ? 'textures ON' : 'colors ON'}`);
 
     // Если текстуры не загружены и пытаемся включить их, ничего не делаем
-    if (shouldUseTextures && !this.textureManager?.atlasTexture) {
+    if (shouldUseTextures && this.textureManager && !this.textureManager.isAtlasLoaded()) {
       console.warn('[World] Cannot enable textures - textures not loaded');
       return;
     }
@@ -161,6 +173,17 @@ export class World {
         })
       );
     });
+  }
+
+  // Пересоздаёт меши для всех уже созданных чанков (используется после загрузки материалов)
+  private recreateChunkMeshes(): void {
+    console.log('[World] Пересоздание мешей для всех чанков после загрузки материалов');
+    for (const [key, chunk] of this.chunks) {
+      // Удаляем старые меши
+      this.removeChunkMeshes(key);
+      // Создаём новые меши с правильными материалами
+      this.createChunkMeshes(chunk);
+    }
   }
 
   initialize(): void {
@@ -336,6 +359,12 @@ export class World {
 
   private createChunkMeshes(chunk: Chunk): void {
     const key = getChunkKey(chunk.position.q, chunk.position.r);
+
+    // Проверяем готовность материалов перед созданием мешей
+    if (!this.materialsReady) {
+      console.warn(`[World] Материалы ещё не готовы, пропуск создания мешей для чанка ${key}`);
+      return;
+    }
 
     // Group blocks by type
     // Оптимизация: для очень больших чанков пропускаем создание мешей

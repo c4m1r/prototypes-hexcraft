@@ -313,6 +313,7 @@ export class TextureManager {
       uniform sampler2D topTexture;
       uniform sampler2D sideTexture;
       uniform float opacity;
+      uniform bool isTransparent;
       uniform vec3 ambientLightColor;
       uniform vec3 directionalLightColor;
       uniform vec3 directionalLightDirection;
@@ -330,21 +331,26 @@ export class TextureManager {
         // Смешиваем текстуры в зависимости от нормали с плавным переходом
         vec4 color = mix(sideColor, topColor, smoothstep(0.7, 1.0, topFactor));
         
+        // Для непрозрачных блоков отбрасываем пиксели с низкой альфой
+        if (!isTransparent && color.a < 0.5) {
+          discard;
+        }
+        
         // Lambert освещение
         vec3 lightDir = normalize(directionalLightDirection);
         float NdotL = max(dot(vWorldNormal, lightDir), 0.0);
         vec3 lighting = ambientLightColor + directionalLightColor * NdotL;
         color.rgb *= lighting;
         
-        // Для непрозрачных блоков (opacity >= 1.0) всегда устанавливаем альфа = 1.0
+        // Для непрозрачных блоков всегда устанавливаем альфа = 1.0
         // Для прозрачных блоков используем альфа из текстуры, умноженный на opacity
         float finalAlpha;
-        if (opacity >= 1.0) {
-          // Непрозрачный блок - игнорируем альфа-канал из текстуры
-          finalAlpha = 1.0;
-        } else {
+        if (isTransparent) {
           // Прозрачный блок - используем альфа из текстуры с учетом opacity
           finalAlpha = color.a * opacity;
+        } else {
+          // Непрозрачный блок - всегда альфа = 1.0, игнорируем альфа-канал из текстуры
+          finalAlpha = 1.0;
         }
         
         gl_FragColor = vec4(color.rgb, finalAlpha);
@@ -356,6 +362,7 @@ export class TextureManager {
         topTexture: { value: topTexture },
         sideTexture: { value: sideTexture },
         opacity: { value: config.opacity !== undefined ? config.opacity : 1.0 },
+        isTransparent: { value: transparent },
         ambientLightColor: { value: new THREE.Color(0xffffff).multiplyScalar(0.6) },
         directionalLightColor: { value: new THREE.Color(0xffffff).multiplyScalar(0.8) },
         directionalLightDirection: { value: new THREE.Vector3(0.5, 1, 0.5).normalize() }
@@ -364,7 +371,7 @@ export class TextureManager {
       fragmentShader,
       transparent: transparent,
       side: THREE.DoubleSide, // Всегда DoubleSide для правильного отображения с обеих сторон
-      alphaTest: transparent ? 0.1 : 0.0 // Для непрозрачных блоков не используем alphaTest
+      alphaTest: transparent ? 0.1 : 0.5 // Для непрозрачных блоков используем alphaTest для отбрасывания прозрачных пикселей
     });
 
     return material;
@@ -390,6 +397,11 @@ export class TextureManager {
 
   getAnimationTime(): number {
     return this.animationTime;
+  }
+
+  // Публичный метод для проверки загрузки атласа
+  isAtlasLoaded(): boolean {
+    return this.atlasTexture !== null;
   }
 }
 
