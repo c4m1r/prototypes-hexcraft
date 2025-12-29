@@ -134,9 +134,14 @@ export class RaycastManager {
 
   getTargetedBlock(camera: THREE.Camera): { block: Block; name: string } | null {
     const result = this.raycast(camera);
-    if (!result) return null;
+    if (!result) {
+      // Отладочная информация для понимания проблемы
+      console.debug('Raycast: no block found under cursor');
+      return null;
+    }
 
     const blockType = BLOCK_TYPES.find(bt => bt.id === result.block.type);
+    console.debug('Raycast: found block', result.block.type, 'at', result.block.position);
     return {
       block: result.block,
       name: blockType?.name || 'Unknown'

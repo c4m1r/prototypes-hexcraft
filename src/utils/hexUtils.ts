@@ -1,11 +1,11 @@
 import * as THREE from 'three';
 
 // HEX_SIZE - базовая единица размера для pointy-top ориентации
-// Рассчитываем HEX_SIZE так, чтобы расстояние между центрами соседних гексагонов было равно 2 * HEX_RADIUS
+// Рассчитываем HEX_SIZE так, чтобы расстояние между центрами соседних гексагонов было чуть больше 2 * HEX_RADIUS
 // Для pointy-top ориентации стандартная формула дает расстояние size * sqrt(3 + 2.25) = size * sqrt(5.25) ≈ size * 2.291
-// Нам нужно расстояние = 2 * HEX_RADIUS, где HEX_RADIUS = 1
-// Поэтому size = 2 / sqrt(5.25) ≈ 0.8736
-export const HEX_SIZE = 2 / Math.sqrt(5.25); // ≈ 0.8736
+// Нам нужно расстояние = 2.2 (чуть больше 2 * HEX_RADIUS), где HEX_RADIUS = 1
+// Поэтому size = 2.2 / sqrt(5.25) ≈ 0.961
+export const HEX_SIZE = 2.2 / Math.sqrt(5.25); // ≈ 0.961
 export const HEX_WIDTH = Math.sqrt(3) * HEX_SIZE; // Ширина гексагона = √3 * size
 export const HEX_HEIGHT = HEX_WIDTH; // Высота = ширине для квадратного вида
 // Используем радиус описанной окружности для соприкосновения гранями

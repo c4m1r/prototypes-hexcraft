@@ -159,7 +159,9 @@ export class Game {
   }
 
   getSpawnHeight(q: number, r: number): number | null {
-    return this.world.getHighestBlockAt(q, r);
+    const height = this.world.getHighestBlockAt(q, r);
+    console.log(`getSpawnHeight(${q}, ${r}) = ${height}`);
+    return height;
   }
 
   private setupEventListeners(): void {
@@ -315,6 +317,9 @@ export class Game {
     }
 
     const targetedBlock = this.raycastManager.getTargetedBlock(this.camera);
+    if (targetedBlock) {
+      console.debug('Game: targeted block found:', targetedBlock.name, targetedBlock.block.position);
+    }
     const worldDebug = this.world.getDebugInfo();
 
     if (this.onStateChange) {

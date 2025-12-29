@@ -178,6 +178,31 @@ function App() {
     }
   }, [currentScreen, spawnPosition]);
 
+  // Отдельный useEffect для пересчета позиции спавна после создания игры
+  useEffect(() => {
+    if (gameRef.current && currentScreen === 'game') {
+      // Ждем немного чтобы чанки успели загрузиться
+      const recalculateSpawn = () => {
+        try {
+          const spawnHeight = gameRef.current!.getSpawnHeight(0, 0);
+          if (spawnHeight !== null) {
+            const spawnPos = hexToWorld(0, 0, 0);
+            const newY = spawnHeight + 2; // +2 для небольшого отступа над поверхностью
+            gameRef.current!.setPlayerPosition(spawnPos.x, newY, spawnPos.z);
+            console.log(`Player respawned at surface: ${spawnPos.x}, ${newY}, ${spawnPos.z} (surface height: ${spawnHeight})`);
+          } else {
+            console.warn('Could not find spawn height, keeping temporary position');
+          }
+        } catch (error) {
+          console.error('Error recalculating spawn position:', error);
+        }
+      };
+
+      // Пересчитываем спавн через 2 секунды, чтобы чанки успели загрузиться
+      setTimeout(recalculateSpawn, 2000);
+    }
+  }, [currentScreen]);
+
   const handleNewGame = () => {
     setCurrentScreen('worldSetup');
   };
@@ -206,9 +231,9 @@ function App() {
     setLoadingProgress(50);
     setLoadingStatus('Инициализация...');
 
-    // Используем фиксированную высоту спавна
+    // Рассчитываем высоту спавна на поверхности
     const spawnPos = hexToWorld(0, 0, 0);
-    setSpawnPosition({ x: spawnPos.x, y: 15, z: spawnPos.z });
+    setSpawnPosition({ x: spawnPos.x, y: 15, z: spawnPos.z }); // Временная позиция, будет пересчитана после создания игры
 
     setLoadingProgress(70);
     setLoadingStatus('Готово...');

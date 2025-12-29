@@ -327,7 +327,7 @@ export class World {
       if (chunk.blocks.length === 0) {
         console.warn(`[World] Пустой чанк ${key} biome=${chunk.biome}`);
       } else {
-        console.debug(`[World] Чанк ${key} biome=${chunk.biome} blocks=${chunk.blocks.length}`);
+        console.log(`[World] Чанк ${key} biome=${chunk.biome} blocks=${chunk.blocks.length}`);
       }
     }
     
