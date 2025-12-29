@@ -266,6 +266,7 @@ export class TextureManager {
     if (blockId === 'grass' && texturesDifferent && this.atlasTexture) {
       // Используем атлас текстур напрямую для grass блоков
       // Геометрия будет иметь правильные UV координаты для верхней и боковых граней
+      // Важно: не клонируем текстуру, используем оригинал
       const material = new THREE.MeshLambertMaterial({
         map: this.atlasTexture, // Используем весь атлас
         transparent: false, // Grass не прозрачный
@@ -277,7 +278,9 @@ export class TextureManager {
       
       console.log('[TextureManager] Grass block using atlas texture with custom UV geometry', {
         topTexture: `${config.top.row},${config.top.col}`,
-        sideTexture: `${config.side.row},${config.side.col}`
+        sideTexture: `${config.side.row},${config.side.col}`,
+        atlasLoaded: !!this.atlasTexture,
+        atlasSize: this.atlasTexture ? `${this.atlasTexture.image?.width}x${this.atlasTexture.image?.height}` : 'unknown'
       });
       
       return material;

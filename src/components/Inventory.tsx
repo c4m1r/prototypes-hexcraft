@@ -60,10 +60,19 @@ const Inventory: React.FC<InventoryProps> = ({
       positions.push({ row, col, x, y });
     }
 
-    // Рассчитываем размеры контейнера на основе последнего элемента
+    // Рассчитываем размеры контейнера
+    // Для ширины находим максимальную X координату среди всех гексагонов
+    // Это важно для honeycomb паттерна, где последний элемент может быть не самым правым
+    const maxX = positions.length > 0 
+      ? Math.max(...positions.map(p => p.x)) + hexWidth 
+      : hexWidth;
+    
+    // Для высоты используем позицию последнего элемента
     const lastPos = positions[positions.length - 1];
-    const containerWidth = lastPos ? lastPos.x + hexWidth : hexWidth;
     const containerHeight = lastPos ? lastPos.y + hexHeight : hexHeight;
+    
+    // Добавляем небольшой отступ справа для предотвращения обрезания
+    const containerWidth = maxX + 2;
 
     return { positions, containerWidth, containerHeight };
   }, []);

@@ -412,9 +412,17 @@ export class ChunkGenerator {
                 const heightRange = this.config.structures.trees.maxHeight - this.config.structures.trees.minHeight;
                 const trunkHeight = this.config.structures.trees.minHeight + Math.floor(this.simpleNoise(worldQ * 0.2, worldR * 0.2) * heightRange);
 
+                // Ствол начинается с surfaceHeight + 1 (над поверхностью)
+                // Но нужно проверить, нет ли там дополнительного grass блока
+                const treeStartY = surfaceHeight + 1;
+                
+                // Если на treeStartY уже есть блок (например, дополнительный grass), начинаем с treeStartY + 1
+                const treeStartKey = `${worldQ},${worldR},${treeStartY}`;
+                const actualStartY = blockMap.has(treeStartKey) ? treeStartY + 1 : treeStartY;
+
                 // Ствол
-                for (let i = 1; i <= trunkHeight && surfaceHeight + i < maxY; i++) {
-                  const trunkY = surfaceHeight + i;
+                for (let i = 0; i < trunkHeight && actualStartY + i < maxY; i++) {
+                  const trunkY = actualStartY + i;
                   const trunkKey = `${worldQ},${worldR},${trunkY}`;
 
                   if (!blockMap.has(trunkKey)) {
@@ -426,11 +434,11 @@ export class ChunkGenerator {
                   }
                 }
 
-                // Многослойный навес листьев
+                // Многослойный навес листьев (используем actualStartY вместо surfaceHeight)
                 const canopyLayers = [
-                  { y: surfaceHeight + trunkHeight, radius: 2 },
-                  { y: surfaceHeight + trunkHeight + 1, radius: 1 },
-                  { y: surfaceHeight + trunkHeight - 1, radius: 2 }
+                  { y: actualStartY + trunkHeight, radius: 2 },
+                  { y: actualStartY + trunkHeight + 1, radius: 1 },
+                  { y: actualStartY + trunkHeight - 1, radius: 2 }
                 ];
 
                 for (const layer of canopyLayers) {

@@ -21,6 +21,7 @@
   min-width: 450px;
   max-height: 90vh;
   overflow-y: auto;
+  overflow-x: visible; /* Позволяем контенту выходить за пределы для правильного отображения honeycomb */
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
 }
 
@@ -333,6 +334,8 @@
   flex: 1;
   display: flex;
   justify-content: center;
+  min-width: 0; /* Позволяет контейнеру сжиматься при необходимости */
+  overflow-x: visible; /* Позволяем honeycomb выходить за пределы для правильного отображения */
 }
 
 .inventory-honeycomb {
