@@ -180,8 +180,8 @@ export const GameUI = React.memo(function GameUI({
         {playerState?.hotbar?.map((slot, index) => (
           <div
             key={index}
-            className={`w-12 h-12 border-2 rounded flex items-center justify-center text-white text-sm font-bold ${
-              index === 0 ? 'border-yellow-400 bg-yellow-400/20' : 'border-white/30'
+            className={`w-12 h-12 border-2 rounded flex items-center justify-center text-white text-sm font-bold relative ${
+              index === playerState?.selectedSlot ? 'border-yellow-400 bg-yellow-400/20' : 'border-white/30'
             }`}
           >
             {slot.item && (

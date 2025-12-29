@@ -476,7 +476,7 @@ export class ChunkGenerator {
 
     // Карта высот для чанка
     const chunkHeightMap = new Map<string, number>();
-    const passableTypes = new Set(['water', 'lava', 'leaves', 'ice']);
+    const passableTypes = new Set(['water', 'lava', 'leaves']);
 
     for (const block of blocks) {
       const posKey = `${block.position.q},${block.position.r}`;
@@ -534,7 +534,7 @@ export class ChunkGenerator {
     // Валидация плавающих блоков
     if (!this.config.optimization.skipFloatingBlockValidation) {
       const blocksToRemove: Block[] = [];
-      const passableBlocks = new Set(['water', 'lava', 'leaves', 'ice']);
+      const passableBlocks = new Set(['water', 'lava', 'leaves']);
 
       for (const block of blocks) {
         const y = block.position.y;

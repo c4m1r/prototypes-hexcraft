@@ -52,6 +52,7 @@ export class Game {
   private playerHotbar: InventorySlot[] = [];
   private playerEquipment: EquipmentSlot[] = [];
   private playerName: string = 'Player';
+  private selectedSlot: number = 0;
   private droppedItems: DroppedItem[] = [];
   private nextItemId: number = 0;
   private droppedItemMeshes: Map<string, THREE.Mesh> = new Map();
@@ -182,19 +183,27 @@ export class Game {
         }
       } else if (e.button === 2) {
         // Размещение блока - уменьшаем количество в инвентаре
-        const selectedSlot = this.player.getSelectedSlot();
-        const selectedItem = this.playerHotbar[selectedSlot]?.item;
+        const selectedItem = this.playerHotbar[this.selectedSlot]?.item;
         if (selectedItem && selectedItem.type === 'block') {
-          // Проверяем есть ли предмет в инвентаре
-          if (this.playerHotbar[selectedSlot].count > 0) {
+          // Проверяем есть ли предмет в инвентаре (для бесконечных предметов всегда true)
+          const hasItem = selectedItem.infinite || (this.playerHotbar[this.selectedSlot].count > 0);
+          if (hasItem) {
             // Размещаем блок
             const placed = this.raycastManager.placeBlock(this.camera, selectedItem.id);
             if (placed) {
-              // Уменьшаем количество
-              this.playerHotbar[selectedSlot].count--;
-              // Если количество стало 0 - удаляем предмет
-              if (this.playerHotbar[selectedSlot].count === 0) {
-                this.playerHotbar[selectedSlot].item = null;
+              // Уменьшаем количество только для не бесконечных предметов
+              if (!selectedItem.infinite) {
+                // Создаем новый массив для обновления состояния
+                const newHotbar = [...this.playerHotbar];
+                newHotbar[this.selectedSlot] = {
+                  ...newHotbar[this.selectedSlot],
+                  count: newHotbar[this.selectedSlot].count - 1
+                };
+                // Если количество стало 0 - удаляем предмет
+                if (newHotbar[this.selectedSlot].count === 0) {
+                  newHotbar[this.selectedSlot] = { item: null, count: 0 };
+                }
+                this.playerHotbar = newHotbar;
               }
             }
           }
@@ -207,11 +216,30 @@ export class Game {
     });
 
     document.addEventListener('keydown', (e) => {
-      if (document.pointerLockElement !== document.body) return;
+      if (document.pointerLockElement !== document.body) {
+        // Обработка клавиш для выбора слотов работает даже без pointer lock
+        if (e.code >= 'Digit1' && e.code <= 'Digit9') {
+          const digit = parseInt(e.code.replace('Digit', '')) - 1;
+          if (digit >= 0 && digit < this.playerHotbar.length) {
+            this.selectedSlot = digit;
+            console.log('Selected slot:', this.selectedSlot);
+          }
+        }
+        return;
+      }
 
       if (e.key.toLowerCase() === 'e') {
         // Подбор предметов
         this.pickupNearbyItems();
+      }
+
+      // Обработка клавиш для выбора слотов (1-9)
+      if (e.code >= 'Digit1' && e.code <= 'Digit9') {
+        const digit = parseInt(e.code.replace('Digit', '')) - 1;
+        if (digit >= 0 && digit < this.playerHotbar.length) {
+          this.selectedSlot = digit;
+          console.log('Selected slot:', this.selectedSlot);
+        }
       }
     });
 
@@ -314,7 +342,8 @@ export class Game {
           name: this.playerName,
           inventory: this.playerInventory,
           hotbar: this.playerHotbar,
-          equipment: this.playerEquipment
+          equipment: this.playerEquipment,
+          selectedSlot: this.selectedSlot
         },
         droppedItems: this.droppedItems
       });

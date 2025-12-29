@@ -85,7 +85,7 @@ export class TextureManager {
       top: { row: 0, col: 6 }, // ice
       side: { row: 0, col: 6 }, // ice
       transparent: true,
-      opacity: 0.9
+      opacity: 0.5
     });
 
     // Ряд 2: анимированные блоки
@@ -330,19 +330,22 @@ export class TextureManager {
         // Смешиваем текстуры в зависимости от нормали с плавным переходом
         vec4 color = mix(sideColor, topColor, smoothstep(0.7, 1.0, topFactor));
         
-        // Для непрозрачных блоков игнорируем альфа-канал из текстуры
-        if (opacity >= 1.0) {
-          color.a = 1.0;
-        }
-        
         // Lambert освещение
         vec3 lightDir = normalize(directionalLightDirection);
         float NdotL = max(dot(vWorldNormal, lightDir), 0.0);
         vec3 lighting = ambientLightColor + directionalLightColor * NdotL;
         color.rgb *= lighting;
         
-        // Применяем opacity для прозрачных блоков
-        float finalAlpha = opacity < 1.0 ? color.a * opacity : color.a;
+        // Для непрозрачных блоков (opacity >= 1.0) всегда устанавливаем альфа = 1.0
+        // Для прозрачных блоков используем альфа из текстуры, умноженный на opacity
+        float finalAlpha;
+        if (opacity >= 1.0) {
+          // Непрозрачный блок - игнорируем альфа-канал из текстуры
+          finalAlpha = 1.0;
+        } else {
+          // Прозрачный блок - используем альфа из текстуры с учетом opacity
+          finalAlpha = color.a * opacity;
+        }
         
         gl_FragColor = vec4(color.rgb, finalAlpha);
       }

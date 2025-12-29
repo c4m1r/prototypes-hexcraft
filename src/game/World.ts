@@ -149,7 +149,7 @@ export class World {
       let opacity = 1;
       if (isLeaves) opacity = 0.75;
       else if (isWater) opacity = 0.7;
-      else if (isIce) opacity = 0.9;
+      else if (isIce) opacity = 0.45;
 
       this.materials.set(
         blockType.id,
