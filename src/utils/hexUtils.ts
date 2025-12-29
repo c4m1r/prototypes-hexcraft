@@ -4,10 +4,12 @@ import * as THREE from 'three';
 export const HEX_SIZE = 1;
 export const HEX_WIDTH = Math.sqrt(3) * HEX_SIZE; // Ширина гексагона = √3 * size
 export const HEX_HEIGHT = HEX_WIDTH; // Высота = ширине для квадратного вида
-// Для правильного соприкосновения гранями используем радиус вписанной окружности (inradius)
-// Расстояние между центрами = sqrt(3) * HEX_SIZE = диаметр вписанной окружности
-// Поэтому радиус геометрии = sqrt(3) / 2 * HEX_SIZE
-export const HEX_RADIUS = (Math.sqrt(3) / 2) * HEX_SIZE;
+// Для правильного соприкосновения гранями используем радиус описанной окружности (circumradius)
+// Расстояние между центрами соседних гексагонов = sqrt(3) * HEX_SIZE
+// Радиус описанной окружности = HEX_SIZE (для pointy-top ориентации)
+// Радиус вписанной окружности = sqrt(3)/2 * HEX_SIZE
+// Используем радиус описанной окружности для соприкосновения гранями
+export const HEX_RADIUS = HEX_SIZE;
 
 export interface HexCoords {
   q: number;
@@ -18,17 +20,24 @@ export interface HexCoords {
 export function hexToWorld(q: number, r: number, y: number = 0): THREE.Vector3 {
   // Для pointy-top ориентации (остриями вверх):
   // Стандартная формула для гексагональной сетки
-  // x = size * √3 * (q + r/2)
-  // z = size * 1.5 * r
-  const x = HEX_SIZE * Math.sqrt(3) * (q + r / 2);
-  const z = HEX_SIZE * 1.5 * r;
+  // Расстояние между центрами = sqrt(3) * HEX_SIZE
+  // Для соприкосновения гранями радиус описанной окружности должен быть равен половине расстояния между центрами
+  // Радиус описанной окружности = sqrt(3)/2 * HEX_SIZE (это текущий HEX_RADIUS)
+  // Но для правильного соприкосновения гранями нужно использовать радиус описанной окружности = HEX_SIZE
+  // Поэтому расстояние между центрами должно быть 2 * HEX_SIZE
+  // Умножаем стандартную формулу на коэффициент 2/√3
+  const spacingMultiplier = 2 / Math.sqrt(3);
+  const x = HEX_SIZE * spacingMultiplier * Math.sqrt(3) * (q + r / 2);
+  const z = HEX_SIZE * spacingMultiplier * 1.5 * r;
   return new THREE.Vector3(x, y * HEX_HEIGHT, z);
 }
 
 export function worldToHex(x: number, z: number): HexCoords {
   // Обратная формула для pointy-top ориентации
-  const q = (Math.sqrt(3) / 3 * x - 1 / 3 * z) / HEX_SIZE;
-  const r = (2 / 3 * z) / HEX_SIZE;
+  // Учитываем spacingMultiplier = 2/√3
+  const spacingMultiplier = 2 / Math.sqrt(3);
+  const q = (Math.sqrt(3) / 3 * x - 1 / 3 * z) / (HEX_SIZE * spacingMultiplier);
+  const r = (2 / 3 * z) / (HEX_SIZE * spacingMultiplier);
   return axialRound(q, r);
 }
 

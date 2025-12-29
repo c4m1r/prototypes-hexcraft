@@ -29,6 +29,8 @@ const Inventory: React.FC<InventoryProps> = ({
   const [draggedItem, setDraggedItem] = useState<{ item: Item; count: number; fromSlot: number; fromType: 'inventory' | 'hotbar' } | null>(null);
   const [dragOverSlot, setDragOverSlot] = useState<number | null>(null);
   const [tooltip, setTooltip] = useState<{ item: Item; x: number; y: number } | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const [dragStartSlot, setDragStartSlot] = useState<{ index: number; type: 'inventory' | 'hotbar' } | null>(null);
   // TODO: Реализовать систему игроков в будущем
   // const [players] = useState<Player[]>([
   //   { id: '1', name: playerState?.name || 'Player', position: { x: 0, y: 0, z: 0 }, isOnline: true }
@@ -106,6 +108,88 @@ const Inventory: React.FC<InventoryProps> = ({
     return () => document.removeEventListener('keydown', handleKeyPress);
   }, [isOpen, onClose]);
 
+  // Глобальный обработчик для перетаскивания мышью
+  useEffect(() => {
+    if (isDragging) {
+      document.body.classList.add('dragging');
+    } else {
+      document.body.classList.remove('dragging');
+    }
+    return () => {
+      document.body.classList.remove('dragging');
+    };
+  }, [isDragging]);
+
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      if (isDragging && draggedItem) {
+        // Находим элемент под курсором
+        const elementUnderCursor = document.elementFromPoint(e.clientX, e.clientY);
+        if (elementUnderCursor) {
+          const hexagonSlot = elementUnderCursor.closest('.hexagon-slot');
+          if (hexagonSlot) {
+            const slotIndex = parseInt(hexagonSlot.getAttribute('data-slot-index') || '-1');
+            const slotType = hexagonSlot.getAttribute('data-slot-type') as 'inventory' | 'hotbar' | null;
+            if (slotIndex !== -1 && slotType && (draggedItem.fromSlot !== slotIndex || draggedItem.fromType !== slotType)) {
+              setDragOverSlot(slotIndex);
+            } else {
+              setDragOverSlot(null);
+            }
+          } else {
+            // Проверяем, находимся ли мы над панелью инвентаря или хотбара
+            const inventoryPanel = elementUnderCursor.closest('.inventory-honeycomb');
+            const hotbarPanel = elementUnderCursor.closest('.hotbar-honeycomb');
+            if (!inventoryPanel && !hotbarPanel) {
+              setDragOverSlot(null);
+            }
+          }
+        }
+      }
+    };
+
+    const handleMouseUp = (e: MouseEvent) => {
+      if (isDragging && draggedItem) {
+        if (dragOverSlot !== null) {
+          // Определяем тип слота по элементу под курсором
+          const elementUnderCursor = document.elementFromPoint(e.clientX, e.clientY);
+          let targetType: 'inventory' | 'hotbar' = draggedItem.fromType;
+          if (elementUnderCursor) {
+            const hexagonSlot = elementUnderCursor.closest('.hexagon-slot');
+            if (hexagonSlot) {
+              const slotType = hexagonSlot.getAttribute('data-slot-type') as 'inventory' | 'hotbar' | null;
+              if (slotType) {
+                targetType = slotType;
+              }
+            } else {
+              // Проверяем панели
+              const inventoryPanel = elementUnderCursor.closest('.inventory-honeycomb');
+              const hotbarPanel = elementUnderCursor.closest('.hotbar-honeycomb');
+              if (inventoryPanel) {
+                targetType = 'inventory';
+              } else if (hotbarPanel) {
+                targetType = 'hotbar';
+              }
+            }
+          }
+          handleDrop(dragOverSlot, targetType, draggedItem);
+        }
+        setIsDragging(false);
+        setDragStartSlot(null);
+        setDraggedItem(null);
+        setDragOverSlot(null);
+      }
+    };
+
+    if (isDragging) {
+      document.addEventListener('mousemove', handleMouseMove);
+      document.addEventListener('mouseup', handleMouseUp);
+      return () => {
+        document.removeEventListener('mousemove', handleMouseMove);
+        document.removeEventListener('mouseup', handleMouseUp);
+      };
+    }
+  }, [isDragging, draggedItem, dragOverSlot, dragStartSlot]);
+
   // Гексагональный слот
   const HexagonSlot: React.FC<{
     slot: InventorySlot;
@@ -116,11 +200,48 @@ const Inventory: React.FC<InventoryProps> = ({
     const isDragOver = dragOverSlot === index;
     const isDraggedFrom = draggedItem?.fromSlot === index && draggedItem?.fromType === type;
 
+    const handleMouseDown = (e: React.MouseEvent) => {
+      if (e.button === 0 && slot.item && !isDragging) {
+        e.preventDefault();
+        setIsDragging(true);
+        setDragStartSlot({ index, type });
+        setDraggedItem({ item: slot.item, count: slot.count, fromSlot: index, fromType: type });
+      }
+    };
+
     return (
       <div
         className={`hexagon-slot ${isDragOver ? 'drag-over' : ''} ${isDraggedFrom ? 'dragged-from' : ''}`}
-        onClick={(e) => onClick(e, index, type)}
+        data-slot-index={index}
+        data-slot-type={type}
+        onClick={(e) => {
+          if (!isDragging) {
+            onClick(e, index, type);
+          }
+        }}
         onContextMenu={(e) => onClick(e, index, type)}
+        onMouseDown={handleMouseDown}
+        onMouseEnter={(e) => {
+          if (slot.item && !isDragging) {
+            const rect = e.currentTarget.getBoundingClientRect();
+            setTooltip({
+              item: slot.item,
+              x: rect.left + rect.width / 2,
+              y: rect.top - 10
+            });
+          }
+          if (isDragging && draggedItem && (draggedItem.fromSlot !== index || draggedItem.fromType !== type)) {
+            setDragOverSlot(index);
+          }
+        }}
+        onMouseLeave={() => {
+          if (!isDragging) {
+            setTooltip(null);
+          }
+          if (isDragging && dragOverSlot === index) {
+            setDragOverSlot(null);
+          }
+        }}
         role="button"
         tabIndex={0}
         aria-label={`Slot ${index + 1}${slot.item ? `: ${slot.item.name} (${slot.count})` : ': Empty'}`}
@@ -130,17 +251,16 @@ const Inventory: React.FC<InventoryProps> = ({
             onClick(e as any, index, type);
           }
         }}
-        onMouseEnter={(e) => {
+        draggable={!!slot.item}
+        onDragStart={(e) => {
           if (slot.item) {
-            const rect = e.currentTarget.getBoundingClientRect();
-            setTooltip({
-              item: slot.item,
-              x: rect.left + rect.width / 2,
-              y: rect.top - 10
-            });
+            setDraggedItem({ item: slot.item, count: slot.count, fromSlot: index, fromType: type });
           }
         }}
-        onMouseLeave={() => setTooltip(null)}
+        onDragEnd={() => {
+          setDraggedItem(null);
+          setDragOverSlot(null);
+        }}
         onDragOver={(e) => {
           e.preventDefault();
           setDragOverSlot(index);
@@ -153,13 +273,6 @@ const Inventory: React.FC<InventoryProps> = ({
             handleDrop(index, type, draggedItem);
           }
         }}
-        draggable={!!slot.item}
-        onDragStart={(_e) => {
-          if (slot.item) {
-            setDraggedItem({ item: slot.item, count: slot.count, fromSlot: index, fromType: type });
-          }
-        }}
-        onDragEnd={() => setDraggedItem(null)}
       >
         <div className="hexagon-content">
           {slot.item && (
@@ -409,7 +522,7 @@ const Inventory: React.FC<InventoryProps> = ({
 
           {/* Инвентарь */}
           <div className="inventory-panel">
-            <div className="inventory-honeycomb">
+            <div className="inventory-honeycomb" data-panel-type="inventory">
               {playerState.inventory?.map((slot, index) => {
                 const positions = calculateHexagonPositions(INVENTORY_SIZE, HEXAGONS_PER_ROW);
                 const pos = positions[index] || { x: 0, y: 0 };
@@ -439,7 +552,7 @@ const Inventory: React.FC<InventoryProps> = ({
 
         {/* Хоткеи */}
         <div className="hotbar-panel">
-          <div className="hotbar-honeycomb">
+          <div className="hotbar-honeycomb" data-panel-type="hotbar">
             {playerState.hotbar?.map((slot, index) => {
               const positions = calculateHexagonPositions(HOTBAR_SIZE, HEXAGONS_PER_ROW);
               const pos = positions[index] || { x: 0, y: 0 };
