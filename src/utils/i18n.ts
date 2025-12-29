@@ -113,6 +113,7 @@ export interface Translations {
     head: string;
     chest: string;
     legs: string;
+    feet: string;
     cape_vanity: string;
     amulet: string;
     ring1: string;
@@ -236,6 +237,7 @@ const translations: Record<Language, Translations> = {
       head: 'Голова',
       chest: 'Туловище',
       legs: 'Ноги',
+      feet: 'Ступни',
       cape_vanity: 'Плащ (косметика)',
       amulet: 'Амулет',
       ring1: 'Кольцо 1',
@@ -357,6 +359,7 @@ const translations: Record<Language, Translations> = {
       head: 'Head',
       chest: 'Chest',
       legs: 'Legs',
+      feet: 'Feet',
       cape_vanity: 'Cape (Vanity)',
       amulet: 'Amulet',
       ring1: 'Ring 1',
@@ -478,6 +481,7 @@ const translations: Record<Language, Translations> = {
       head: 'Cabeza',
       chest: 'Torso',
       legs: 'Piernas',
+      feet: 'Pies',
       cape_vanity: 'Capa (Vanidad)',
       amulet: 'Amuleto',
       ring1: 'Anillo 1',
@@ -599,6 +603,7 @@ const translations: Record<Language, Translations> = {
       head: 'Kopf',
       chest: 'Brust',
       legs: 'Beine',
+      feet: 'Füße',
       cape_vanity: 'Umhang (Eitelkeit)',
       amulet: 'Amulett',
       ring1: 'Ring 1',
@@ -720,6 +725,7 @@ const translations: Record<Language, Translations> = {
       head: '头部',
       chest: '胸部',
       legs: '腿部',
+      feet: '脚部',
       cape_vanity: '披风 (虚荣)',
       amulet: '护符',
       ring1: '戒指 1',
@@ -841,6 +847,7 @@ const translations: Record<Language, Translations> = {
       head: '머리',
       chest: '가슴',
       legs: '다리',
+      feet: '발',
       cape_vanity: '망토 (허영)',
       amulet: '목걸이',
       ring1: '반지 1',
@@ -962,6 +969,7 @@ const translations: Record<Language, Translations> = {
       head: '頭',
       chest: '胸',
       legs: '脚',
+      feet: '足',
       cape_vanity: 'ケープ (バニティ)',
       amulet: 'アミュレット',
       ring1: '指輪 1',

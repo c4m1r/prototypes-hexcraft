@@ -44,6 +44,10 @@ const Inventory: React.FC<InventoryProps> = ({
     const horizontalSpacing = hexWidth * 0.75; // 75% перекрытия для honeycomb
     const verticalSpacing = hexHeight * 0.866; // sin(60°) для вертикального смещения
 
+    // Рассчитываем реальное количество рядов и колонок
+    const actualRows = Math.ceil(totalHexagons / hexagonsPerRow);
+    const actualColsInLastRow = totalHexagons % hexagonsPerRow || hexagonsPerRow;
+
     for (let i = 0; i < totalHexagons; i++) {
       const row = Math.floor(i / hexagonsPerRow);
       const col = i % hexagonsPerRow;
@@ -56,7 +60,12 @@ const Inventory: React.FC<InventoryProps> = ({
       positions.push({ row, col, x, y });
     }
 
-    return positions;
+    // Рассчитываем размеры контейнера на основе последнего элемента
+    const lastPos = positions[positions.length - 1];
+    const containerWidth = lastPos ? lastPos.x + hexWidth : hexWidth;
+    const containerHeight = lastPos ? lastPos.y + hexHeight : hexHeight;
+
+    return { positions, containerWidth, containerHeight };
   }, []);
 
   // Инициализация инвентаря если не существует
@@ -485,7 +494,11 @@ const Inventory: React.FC<InventoryProps> = ({
                     onClick={() => {}}
                   />
                   <EquipmentSlot
-                    slot={playerState.equipment?.[8] || { type: 'cape_vanity', item: null, name: t.inventory.cape_vanity }}
+                    slot={playerState.equipment?.[8] || { type: 'feet', item: null, name: t.inventory.feet }}
+                    onClick={() => {}}
+                  />
+                  <EquipmentSlot
+                    slot={playerState.equipment?.[9] || { type: 'cape_vanity', item: null, name: t.inventory.cape_vanity }}
                     onClick={() => {}}
                   />
                 </div>
@@ -498,23 +511,23 @@ const Inventory: React.FC<InventoryProps> = ({
             {/* Аксессуары - горизонтально между столбцами */}
             <div className="accessories-row-full">
               <EquipmentSlot
-                slot={playerState.equipment?.[9] || { type: 'amulet', item: null, name: t.inventory.amulet }}
+                slot={playerState.equipment?.[10] || { type: 'amulet', item: null, name: t.inventory.amulet }}
                 onClick={() => {}}
               />
               <EquipmentSlot
-                slot={playerState.equipment?.[10] || { type: 'ring1', item: null, name: t.inventory.ring1 }}
+                slot={playerState.equipment?.[11] || { type: 'ring1', item: null, name: t.inventory.ring1 }}
                 onClick={() => {}}
               />
               <EquipmentSlot
-                slot={playerState.equipment?.[11] || { type: 'ring2', item: null, name: t.inventory.ring2 }}
+                slot={playerState.equipment?.[12] || { type: 'ring2', item: null, name: t.inventory.ring2 }}
                 onClick={() => {}}
               />
               <EquipmentSlot
-                slot={playerState.equipment?.[12] || { type: 'artifact1', item: null, name: t.inventory.artifact1 }}
+                slot={playerState.equipment?.[13] || { type: 'artifact1', item: null, name: t.inventory.artifact1 }}
                 onClick={() => {}}
               />
               <EquipmentSlot
-                slot={playerState.equipment?.[13] || { type: 'artifact2', item: null, name: t.inventory.artifact2 }}
+                slot={playerState.equipment?.[14] || { type: 'artifact2', item: null, name: t.inventory.artifact2 }}
                 onClick={() => {}}
               />
             </div>
@@ -522,9 +535,16 @@ const Inventory: React.FC<InventoryProps> = ({
 
           {/* Инвентарь */}
           <div className="inventory-panel">
-            <div className="inventory-honeycomb" data-panel-type="inventory">
+            <div
+              className="inventory-honeycomb"
+              data-panel-type="inventory"
+              style={{
+                width: calculateHexagonPositions(INVENTORY_SIZE, HEXAGONS_PER_ROW).containerWidth,
+                height: calculateHexagonPositions(INVENTORY_SIZE, HEXAGONS_PER_ROW).containerHeight
+              }}
+            >
               {playerState.inventory?.map((slot, index) => {
-                const positions = calculateHexagonPositions(INVENTORY_SIZE, HEXAGONS_PER_ROW);
+                const { positions } = calculateHexagonPositions(INVENTORY_SIZE, HEXAGONS_PER_ROW);
                 const pos = positions[index] || { x: 0, y: 0 };
 
                 return (
@@ -552,9 +572,16 @@ const Inventory: React.FC<InventoryProps> = ({
 
         {/* Хоткеи */}
         <div className="hotbar-panel">
-          <div className="hotbar-honeycomb" data-panel-type="hotbar">
+          <div
+            className="hotbar-honeycomb"
+            data-panel-type="hotbar"
+            style={{
+              width: calculateHexagonPositions(HOTBAR_SIZE, HEXAGONS_PER_ROW).containerWidth,
+              height: calculateHexagonPositions(HOTBAR_SIZE, HEXAGONS_PER_ROW).containerHeight
+            }}
+          >
             {playerState.hotbar?.map((slot, index) => {
-              const positions = calculateHexagonPositions(HOTBAR_SIZE, HEXAGONS_PER_ROW);
+              const { positions } = calculateHexagonPositions(HOTBAR_SIZE, HEXAGONS_PER_ROW);
               const pos = positions[index] || { x: 0, y: 0 };
 
               return (

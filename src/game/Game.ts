@@ -66,7 +66,7 @@ export class Game {
     // Инициализация пустого инвентаря
     this.playerInventory = Array(INVENTORY_SIZE).fill(null).map(() => ({ item: null, count: 0 }));
 
-    // Инициализация экипировки (14 слотов)
+    // Инициализация экипировки (15 слотов)
     this.playerEquipment = [
       { type: 'helmet', item: null, name: 'Helmet' },
       { type: 'chestplate', item: null, name: 'Chestplate' },
@@ -76,6 +76,7 @@ export class Game {
       { type: 'head', item: null, name: 'Head' },
       { type: 'chest', item: null, name: 'Chest' },
       { type: 'legs', item: null, name: 'Legs' },
+      { type: 'feet', item: null, name: 'Feet' },
       { type: 'cape_vanity', item: null, name: 'Cape (Vanity)' },
       { type: 'amulet', item: null, name: 'Amulet' },
       { type: 'ring1', item: null, name: 'Ring 1' },
