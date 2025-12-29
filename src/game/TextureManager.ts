@@ -46,10 +46,9 @@ export class TextureManager {
         texture => {
           texture.magFilter = THREE.NearestFilter;
           texture.minFilter = THREE.NearestFilter;
-          texture.wrapS = THREE.RepeatWrapping;
-          texture.wrapT = THREE.RepeatWrapping;
-          texture.flipY = false; // Не инвертируем Y координату для правильного отображения атласа
-          this.atlasTexture = texture;
+        texture.wrapS = THREE.RepeatWrapping;
+        texture.wrapT = THREE.RepeatWrapping;
+        this.atlasTexture = texture;
           this.prepareAnimatedTextures();
           resolve();
         },
@@ -262,35 +261,9 @@ export class TextureManager {
     // Для остальных блоков прозрачность определяется только конфигом
     const shouldBeTransparent = (config.transparent === true) || blockId === 'leaves' || blockId === 'water' || blockId === 'ice' || blockId === 'lava';
     
-    // Для grass блоков используем стандартный материал с атласом текстур
-    // Геометрия будет создана отдельно с правильными UV координатами
-    if (blockId === 'grass' && texturesDifferent && this.atlasTexture) {
-      // Используем атлас текстур напрямую для grass блоков
-      // Геометрия будет иметь правильные UV координаты для верхней и боковых граней
-      // Важно: не клонируем текстуру, используем оригинал
-      const material = new THREE.MeshLambertMaterial({
-        map: this.atlasTexture, // Используем весь атлас
-        transparent: false, // Grass не прозрачный
-        opacity: 1.0,
-        side: THREE.DoubleSide,
-        alphaTest: 0.0,
-        color: 0xffffff
-      });
-      
-      console.log('[TextureManager] Grass block using atlas texture with custom UV geometry', {
-        topTexture: `${config.top.row},${config.top.col}`,
-        sideTexture: `${config.side.row},${config.side.col}`,
-        atlasLoaded: !!this.atlasTexture,
-        atlasSize: this.atlasTexture ? `${this.atlasTexture.image?.width}x${this.atlasTexture.image?.height}` : 'unknown'
-      });
-      
-      return material;
-    }
-    
-    // Для остальных блоков с разными текстурами используем кастомный шейдер
+    // Для всех блоков с разными текстурами используем кастомный шейдер
     if (texturesDifferent) {
-      const material = this.createDualTextureMaterial(topTexture, sideTexture, config, shouldBeTransparent);
-      return material;
+      return this.createDualTextureMaterial(topTexture, sideTexture, config, shouldBeTransparent);
     } else {
       // Если текстуры одинаковые или top не задан, используем side для всех граней
       const material = new THREE.MeshLambertMaterial({

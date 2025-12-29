@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { Chunk, Block, BLOCK_TYPES } from '../types/game';
 import { ChunkGenerator } from './ChunkGenerator';
-import { hexToWorld, getChunkKey, worldToChunk, createHexGeometryWithUV, createGrassHexGeometryWithUV, worldToHex, HEX_HEIGHT, HEX_RADIUS } from '../utils/hexUtils';
+import { hexToWorld, getChunkKey, worldToChunk, createHexGeometryWithUV, worldToHex, HEX_HEIGHT, HEX_RADIUS } from '../utils/hexUtils';
 import { GameSettings, DEFAULT_SETTINGS } from '../types/settings';
 import { TextureManager } from './TextureManager';
 import { InstancedMeshPool, globalMatrixPool } from '../utils/ObjectPool';
@@ -18,7 +18,6 @@ export class World {
   private scene: THREE.Scene;
   private chunkSize: number = 14;
   private blockGeometry: THREE.CylinderGeometry;
-  private grassBlockGeometry: THREE.BufferGeometry | null = null;
   private materials: Map<string, THREE.Material> = new Map();
   private maxLoadedChunks: number = 15;
   private fogBarrier: THREE.Mesh | null = null;
@@ -74,10 +73,6 @@ export class World {
     // Выделение работает корректно, поэтому используем точно такую же геометрию
     // В новых версиях Three.js CylinderGeometry уже является BufferGeometry
     this.blockGeometry = new THREE.CylinderGeometry(HEX_RADIUS, HEX_RADIUS, HEX_HEIGHT, 6);
-    
-    // Создаём специальную геометрию для grass блоков с правильными UV координатами
-    // Используем координаты из конфига TextureManager: top (0,0), side (0,1)
-    this.grassBlockGeometry = createGrassHexGeometryWithUV(0, 0, 0, 1, 4, 10);
 
     // Загружаем texture manager для работы с текстурами
     this.textureManager = new TextureManager({
@@ -433,12 +428,9 @@ export class World {
 
       // Материалы уже настроены в initializeMaterials() в зависимости от useTextures
 
-      // Для grass блоков используем специальную геометрию с правильными UV координатами
-      const geometry = (type === 'grass' && this.grassBlockGeometry) ? this.grassBlockGeometry : this.blockGeometry;
-
       // Use pooled InstancedMesh for better performance
       const mesh = this.instancedMeshPool!.get();
-      mesh.geometry = geometry;
+      mesh.geometry = this.blockGeometry;
       mesh.material = material;
       mesh.count = blocks.length;
       // Инстансы расположены далеко от (0,0,0), без этого boundingSphere отсечет их.

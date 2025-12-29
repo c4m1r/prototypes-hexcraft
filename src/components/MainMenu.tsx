@@ -65,7 +65,7 @@ export function MainMenu({ onNewGame, onLoadGame, onCoop, onOptions, onAbout }: 
           target="_self"
           className="hover:underline"
         >
-          Prototype 0.1.39 | C4m1r.github.io
+          Prototype 0.1.40 | C4m1r.github.io
         </a>
       </div>
     </div>
