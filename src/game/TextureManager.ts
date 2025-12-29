@@ -48,6 +48,7 @@ export class TextureManager {
           texture.minFilter = THREE.NearestFilter;
           texture.wrapS = THREE.RepeatWrapping;
           texture.wrapT = THREE.RepeatWrapping;
+          texture.flipY = false; // Не инвертируем Y координату для правильного отображения атласа
           this.atlasTexture = texture;
           this.prepareAnimatedTextures();
           resolve();

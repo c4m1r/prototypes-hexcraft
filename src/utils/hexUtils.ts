@@ -3,12 +3,12 @@ import * as THREE from 'three';
 // HEX_SIZE - базовая единица размера для pointy-top ориентации
 // Рассчитываем HEX_SIZE так, чтобы расстояние между центрами соседних гексагонов было точно 2 * HEX_RADIUS + отступ
 // Для pointy-top ориентации стандартная формула дает расстояние size * sqrt(3 + 2.25) = size * sqrt(5.25) ≈ size * 2.291
-// Нужен отступ примерно 2-3 пикселя, что при HEX_RADIUS = 1 составляет примерно 0.015-0.02
-// Поэтому уменьшаем HEX_RADIUS на 0.015 для создания отступа
-export const HEX_RADIUS = 1 - 0.015; // Отступ примерно 1.5% от размера блока
+// Нужен минимальный отступ чтобы блоки не накладывались, но были впритык
+// Уменьшаем HEX_RADIUS на 0.005 для создания небольшого отступа
+export const HEX_RADIUS = 1 - 0.005; // Отступ примерно 0.5% от размера блока
 // Теперь пересчитываем HEX_SIZE так, чтобы расстояние между центрами было 2 * HEX_RADIUS (блоки впритык, но не соприкасаются)
 // Расстояние между центрами = HEX_SIZE * sqrt(5.25) = 2 * HEX_RADIUS
-export const HEX_SIZE = (2 * HEX_RADIUS) / Math.sqrt(5.25); // ≈ 0.945
+export const HEX_SIZE = (2 * HEX_RADIUS) / Math.sqrt(5.25); // ≈ 0.995
 export const HEX_WIDTH = Math.sqrt(3) * HEX_SIZE; // Ширина гексагона = √3 * size
 export const HEX_HEIGHT = HEX_WIDTH; // Высота = ширине для квадратного вида
 
@@ -188,13 +188,16 @@ export function createGrassHexGeometryWithUV(
   const segments = 6;
 
   // Вычисляем UV координаты для текстур в атласе
+  // В Three.js при использовании TextureLoader V координата автоматически инвертируется
+  // Но при использовании атласа напрямую нужно учитывать, что (0,0) - левый верхний угол
+  // Row 0 находится вверху изображения, поэтому V координаты идут сверху вниз
   const topUStart = topTextureCol / atlasCols;
-  const topVStart = topTextureRow / atlasRows;
+  const topVStart = topTextureRow / atlasRows; // Row 0 -> V = 0, Row 1 -> V = 0.25 и т.д.
   const topUEnd = (topTextureCol + 1) / atlasCols;
   const topVEnd = (topTextureRow + 1) / atlasRows;
 
   const sideUStart = sideTextureCol / atlasCols;
-  const sideVStart = sideTextureRow / atlasRows;
+  const sideVStart = sideTextureRow / atlasRows; // Row 0 -> V = 0
   const sideUEnd = (sideTextureCol + 1) / atlasCols;
   const sideVEnd = (sideTextureRow + 1) / atlasRows;
 

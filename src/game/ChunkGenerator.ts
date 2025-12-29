@@ -374,10 +374,13 @@ export class ChunkGenerator {
             if (grassAboveY < maxY) {
               const grassAboveKey = `${worldQ},${worldR},${grassAboveY}`;
               if (!blockMap.has(grassAboveKey)) {
-                blocks.push({
+                const grassAboveBlock: Block = {
                   type: 'grass',
                   position: { q: worldQ, r: worldR, s, y: grassAboveY }
-                });
+                };
+                blocks.push(grassAboveBlock);
+                // Важно: добавляем блок в blockMap сразу, чтобы дерево видело его
+                blockMap.set(grassAboveKey, grassAboveBlock);
               }
             }
           }
