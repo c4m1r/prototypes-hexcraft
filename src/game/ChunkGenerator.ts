@@ -110,6 +110,7 @@ const DEFAULT_GENERATION_CONFIG: GenerationConfig = {
     maxBlocksPerChunk: 50000,
     skipFloatingBlockValidation: false
   }
+};
 
   private generateFooStructure(
     chunkQ: number,
