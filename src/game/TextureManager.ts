@@ -104,65 +104,76 @@ export class TextureManager {
       opacity: 0.7
     });
 
-    // Ряд 3: ресурсы
+    // Ряд 3: ресурсы (начинается с x=32, col=1)
     this.blockConfigs.set('wood', {
-      top: { row: 2, col: 0 }, // wood
-      side: { row: 2, col: 0 } // wood
+      top: { row: 2, col: 1 }, // wood - ряд 2, x=32 (col=1)
+      side: { row: 2, col: 1 } // wood
     });
     this.blockConfigs.set('leaves', {
-      top: { row: 2, col: 1 }, // leaves
-      side: { row: 2, col: 1 }, // leaves
+      top: { row: 2, col: 2 }, // leaves - ряд 2, x=64 (col=2)
+      side: { row: 2, col: 2 }, // leaves
       transparent: true,
       opacity: 0.75
     });
 
+    // Ряд 4: новые блоки (начинается с x=64, col=2)
+    this.blockConfigs.set('red_mushroom', {
+      top: { row: 3, col: 2 }, // red mushroom - ряд 3, x=64 (col=2)
+      side: { row: 3, col: 2 } // red mushroom
+    });
+    this.blockConfigs.set('mushroom', {
+      top: { row: 3, col: 3 }, // mushroom - ряд 3, x=96 (col=3)
+      side: { row: 3, col: 3 } // mushroom
+    });
+
     this.blockConfigs.set('spruce', {
-      top: { row: 3, col: 2 },
-      side: { row: 3, col: 2 }
+      top: { row: 3, col: 4 }, // spruce - ряд 3, x=128 (col=4)
+      side: { row: 3, col: 4 }
     });
 
     this.blockConfigs.set('pine', {
-      top: { row: 3, col: 3 },
-      side: { row: 3, col: 3 },
+      top: { row: 3, col: 5 }, // pine - ряд 3, x=160 (col=5)
+      side: { row: 3, col: 5 },
       transparent: true,
       opacity: 0.85
     });
 
     this.blockConfigs.set('aethergrass', {
-      top: { row: 3, col: 5 },
-      side: { row: 3, col: 6 }
+      top: { row: 3, col: 6 }, // aethergrass-top - ряд 3, x=192 (col=6)
+      side: { row: 3, col: 7 }, // aethergrass-side - ряд 3, x=224 (col=7)
+      transparent: false // Aethergrass не прозрачный
     });
 
     this.blockConfigs.set('aether', {
-      top: { row: 3, col: 7 },
-      side: { row: 3, col: 7 }
-    });
-
-    this.blockConfigs.set('crystal', {
-      top: { row: 3, col: 8 },
+      top: { row: 3, col: 8 }, // aether - ряд 3, x=256 (col=8)
       side: { row: 3, col: 8 }
     });
 
-    this.blockConfigs.set('aetherwood', {
-      top: { row: 3, col: 9 },
+    this.blockConfigs.set('crystal', {
+      top: { row: 3, col: 9 }, // crystal - ряд 3, x=288 (col=9)
       side: { row: 3, col: 9 }
     });
 
-    this.blockConfigs.set('aetherstone', {
-      top: { row: 3, col: 10 },
+    this.blockConfigs.set('aetherwood', {
+      top: { row: 3, col: 10 }, // aetherwood - ряд 3, x=320 (col=10)
       side: { row: 3, col: 10 }
     });
 
-    this.blockConfigs.set('aetherleaf', {
-      top: { row: 3, col: 11 },
-      side: { row: 3, col: 11 },
-      transparent: true,
-      opacity: 0.4
+    this.blockConfigs.set('aetherstone', {
+      top: { row: 3, col: 11 }, // aetherstone - ряд 3, x=352 (col=11)
+      side: { row: 3, col: 11 }
     });
 
     this.blockConfigs.set('foo', {
-      top: { row: 3, col: 4 },
-      side: { row: 3, col: 4 }
+      top: { row: 3, col: 0 }, // foo - ряд 3, x=0 (col=0) - перед началом ряда 3
+      side: { row: 3, col: 0 }
+    });
+
+    this.blockConfigs.set('aetherleaf', {
+      top: { row: 3, col: 1 }, // aetherleaf - ряд 3, x=32 (col=1) - после foo
+      side: { row: 3, col: 1 },
+      transparent: true,
+      opacity: 0.4
     });
 
     // Ряд 1: дополнительные блоки
@@ -179,15 +190,6 @@ export class TextureManager {
       side: { row: 0, col: 9 } // gold
     });
 
-    // Ряд 4: природа
-    this.blockConfigs.set('red_mushroom', {
-      top: { row: 3, col: 0 }, // red mushroom
-      side: { row: 3, col: 0 } // red mushroom
-    });
-    this.blockConfigs.set('mushroom', {
-      top: { row: 3, col: 1 }, // mushroom
-      side: { row: 3, col: 1 } // mushroom
-    });
   }
 
   private prepareAnimatedTextures(): void {
@@ -392,32 +394,44 @@ export class TextureManager {
       varying vec2 vUv;
 
       void main() {
-        // Определяем, является ли грань верхней (нормаль близка к (0, 1, 0))
-        float topFactor = max(0.0, dot(vWorldNormal, vec3(0.0, 1.0, 0.0)));
-        // Используем верхнюю текстуру для верхней грани, боковую для остальных
+        // Сначала загружаем обе текстуры
         vec4 topColor = texture2D(topTexture, vUv);
         vec4 sideColor = texture2D(sideTexture, vUv);
         
-        // Смешиваем текстуры в зависимости от нормали с плавным переходом
-        vec4 color = mix(sideColor, topColor, smoothstep(0.7, 1.0, topFactor));
+        // Определяем, является ли грань верхней (нормаль близка к (0, 1, 0))
+        // Используем более строгий порог для четкого разделения верх/бок
+        float topFactor = dot(vWorldNormal, vec3(0.0, 1.0, 0.0));
+        bool isTopFace = topFactor > 0.9; // Только для почти вертикальных верхних граней
         
-        // Для непрозрачных блоков игнорируем альфа-канал из текстуры и устанавливаем альфа = 1.0
-        // Это гарантирует, что блок будет полностью непрозрачным
-        if (!isTransparent) {
-          color.a = 1.0;
+        // Начинаем с боковой текстуры для всех граней
+        vec4 color = sideColor;
+        
+        // Заменяем только верхнюю грань верхней текстурой
+        if (isTopFace) {
+          color = topColor;
         }
         
-        // Lambert освещение
+        // Для непрозрачных блоков ВСЕГДА устанавливаем альфа = 1.0 ДО освещения
+        // Это критично для правильного отображения
+        float finalAlpha;
+        if (!isTransparent) {
+          finalAlpha = 1.0;
+          // Игнорируем альфа-канал из текстуры для непрозрачных блоков
+          color.a = 1.0;
+        } else {
+          // Для прозрачных блоков используем альфа из текстуры с учетом opacity
+          finalAlpha = color.a * opacity;
+        }
+        
+        // Lambert освещение применяется после установки альфы
         vec3 lightDir = normalize(directionalLightDirection);
         float NdotL = max(dot(vWorldNormal, lightDir), 0.0);
         vec3 lighting = ambientLightColor + directionalLightColor * NdotL;
         color.rgb *= lighting;
         
-        // Для прозрачных блоков применяем opacity
-        float finalAlpha = isTransparent ? color.a * opacity : 1.0;
-        
         // Для непрозрачных блоков отбрасываем пиксели с очень низкой альфой (артефакты сжатия)
-        if (!isTransparent && color.a < 0.5) {
+        // Но это не должно происходить, так как мы уже установили альфа = 1.0
+        if (!isTransparent && finalAlpha < 0.5) {
           discard;
         }
         
