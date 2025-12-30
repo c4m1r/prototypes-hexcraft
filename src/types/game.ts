@@ -83,6 +83,7 @@ export const ITEMS: Item[] = [
   { id: 'snow', name: 'Snow Block', type: 'block', stackSize: 72, maxStackSize: 72, rarity: 'common', color: '#e8f2f7' },
   { id: 'ice', name: 'Ice Block', type: 'block', stackSize: 72, maxStackSize: 72, rarity: 'common', color: '#b8d8e8' },
   { id: 'lava', name: 'Lava Block', type: 'block', stackSize: 72, maxStackSize: 72, rarity: 'common', color: '#ff4500' },
+  { id: 'foo', name: 'Foo Block', type: 'block', stackSize: 64, maxStackSize: 64, rarity: 'rare', color: '#ff00ff' },
 
   // Руда
   { id: 'bronze', name: 'Bronze Ore', type: 'material', stackSize: 64, maxStackSize: 64, rarity: 'uncommon', color: '#cd7f32' },
@@ -109,6 +110,7 @@ export const BLOCK_TYPES: BlockType[] = [
   { id: 'bronze', name: 'Bronze', color: '#cd7f32' },
   { id: 'silver', name: 'Silver', color: '#c0c0c0' },
   { id: 'gold', name: 'Gold', color: '#ffd700' },
+  { id: 'foo', name: 'Foo', color: '#ff00ff' },
   { id: 'red_mushroom', name: 'Red Mushroom', color: '#dc143c' },
   { id: 'mushroom', name: 'Mushroom', color: '#8b4513' },
 ];

@@ -116,6 +116,11 @@ export class TextureManager {
       opacity: 0.75
     });
 
+    this.blockConfigs.set('foo', {
+      top: { row: 3, col: 2 }, // foo top
+      side: { row: 3, col: 2 } // foo side
+    });
+
     // Ряд 1: дополнительные блоки
     this.blockConfigs.set('bronze', {
       top: { row: 0, col: 7 }, // bronze

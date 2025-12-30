@@ -109,6 +109,52 @@ const DEFAULT_GENERATION_CONFIG: GenerationConfig = {
     maxBlocksPerChunk: 50000,
     skipFloatingBlockValidation: false
   }
+
+  private generateFooStructure(
+    chunkQ: number,
+    chunkR: number,
+    heightMap: Map<string, number>,
+    blockMap: Map<string, Block>,
+    blocks: Block[]
+  ): void {
+    const chance = 0.25;
+    if (Math.random() > chance) return;
+
+    const centerLocalQ = Math.floor(this.chunkSize / 2);
+    const centerLocalR = Math.floor(this.chunkSize / 2);
+    const offsets = [
+      { dq: 0, dr: 0 },
+      { dq: 1, dr: 0 },
+      { dq: -1, dr: 0 },
+      { dq: 0, dr: 1 },
+      { dq: 0, dr: -1 },
+      { dq: 1, dr: -1 },
+      { dq: -1, dr: 1 }
+    ];
+
+    for (const offset of offsets) {
+      const localQ = centerLocalQ + offset.dq;
+      const localR = centerLocalR + offset.dr;
+      if (localQ < 0 || localQ >= this.chunkSize || localR < 0 || localR >= this.chunkSize) continue;
+
+      const surfaceHeight = heightMap.get(`${localQ},${localR}`);
+      if (surfaceHeight === undefined) continue;
+
+      const worldQ = chunkQ * this.chunkSize + localQ;
+      const worldR = chunkR * this.chunkSize + localR;
+      const fooY = surfaceHeight;
+      const fooKey = `${worldQ},${worldR},${fooY}`;
+      if (blockMap.has(fooKey)) continue;
+
+      const fooBlock: Block = {
+        type: 'foo',
+        position: { q: worldQ, r: worldR, s: -worldQ - worldR, y: fooY }
+      };
+
+      blocks.push(fooBlock);
+      blockMap.set(fooKey, fooBlock);
+    }
+  }
 };
 
 export class ChunkGenerator {
@@ -478,6 +524,7 @@ export class ChunkGenerator {
         }
       }
     }
+    this.generateFooStructure(chunkQ, chunkR, smoothedHeightMap, blockMap, blocks);
 
     // Финализация
     const validatedBlockMap = new Map<string, Block>();

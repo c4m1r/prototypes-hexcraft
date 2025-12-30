@@ -1,41 +1,110 @@
 import * as THREE from 'three';
 
-// HEX_SIZE - базовая единица размера для pointy-top ориентации
-// Рассчитываем HEX_SIZE так, чтобы расстояние между центрами соседних гексагонов было точно 2 * HEX_RADIUS + минимальный отступ
-// Для pointy-top ориентации стандартная формула дает расстояние size * sqrt(3 + 2.25) = size * sqrt(5.25) ≈ size * 2.291
-// Отступ задаем как 0.00001, чтобы блоки практически соприкасались, но не накладывались
-export const HEX_RADIUS = 1 - 0.000001;
-// Теперь пересчитываем HEX_SIZE так, чтобы расстояние между центрами было 2 * HEX_RADIUS
-export const HEX_SIZE = (2 * HEX_RADIUS) / Math.sqrt(5.25);
-export const HEX_WIDTH = Math.sqrt(3) * HEX_SIZE; // Ширина гексагона = √3 * size
-export const HEX_HEIGHT = HEX_WIDTH; // Высота = ширине для квадратного вида
+/*
+  ============================================================
+  HEX GRID — POINTY-TOP ORIENTATION (остриями вверх)
+  ============================================================
 
+  ВАЖНО:
+  - В hex grid size = радиус гекса (расстояние от центра до ВЕРШИНЫ)
+  - Этот же size ОБЯЗАН использоваться:
+      • в формулах сетки (hexToWorld / worldToHex)
+      • в геометрии (CylinderGeometry radius)
+  - Нельзя "подгонять" size формулами — это вызывает дрейф и наложения
+*/
+
+/*
+  ------------------------------------------------------------
+  БАЗОВЫЕ РАЗМЕРЫ
+  ------------------------------------------------------------
+*/
+
+// Единственный источник истины для размера гекса.
+// Радиус от центра до вершины.
+export const HEX_SIZE = 1.0;
+
+// Радиус геометрии цилиндра.
+// Для правильного соприкосновения гексов он ДОЛЖЕН быть равен HEX_SIZE.
+export const HEX_RADIUS = HEX_SIZE;
+
+// Высота блока по оси Y (толщина тайла).
+// Не участвует в grid-математике.
+export const HEX_HEIGHT = 1.0;
+
+/*
+  ------------------------------------------------------------
+  КООРДИНАТЫ
+  ------------------------------------------------------------
+*/
+
+// Cube / Axial координаты гекса.
+// Всегда должно выполняться: q + r + s = 0
 export interface HexCoords {
   q: number;
   r: number;
   s: number;
 }
 
-export function hexToWorld(q: number, r: number, y: number = 0): THREE.Vector3 {
-  // Для pointy-top ориентации (остриями вверх):
-  // Стандартная формула для гексагональной сетки
-  // x = size * √3 * (q + r/2)
-  // z = size * 1.5 * r
-  // HEX_SIZE уже рассчитан так, чтобы расстояние между центрами было 2 * HEX_RADIUS
+/*
+  ------------------------------------------------------------
+  HEX → WORLD
+  ------------------------------------------------------------
+
+  Формулы для pointy-top ориентации (канон):
+
+    x = size * √3 * (q + r/2)
+    z = size * 3/2 * r
+
+  Эти формулы ГАРАНТИРУЮТ:
+  - одинаковое расстояние между центрами
+  - отсутствие накопления ошибки
+  - корректное замыкание колец
+*/
+export function hexToWorld(
+  q: number,
+  r: number,
+  y: number = 0
+): THREE.Vector3 {
+
   const x = HEX_SIZE * Math.sqrt(3) * (q + r / 2);
   const z = HEX_SIZE * 1.5 * r;
+
+  // y умножаем на высоту блока
   return new THREE.Vector3(x, y * HEX_HEIGHT, z);
 }
 
+/*
+  ------------------------------------------------------------
+  WORLD → HEX
+  ------------------------------------------------------------
+
+  Обратное преобразование world → axial
+  Используется для:
+  - определения гекса под курсором
+  - кликов
+  - raycast
+*/
 export function worldToHex(x: number, z: number): HexCoords {
-  // Обратная формула для pointy-top ориентации
+
   const q = (Math.sqrt(3) / 3 * x - 1 / 3 * z) / HEX_SIZE;
   const r = (2 / 3 * z) / HEX_SIZE;
+
   return axialRound(q, r);
 }
 
+/*
+  ------------------------------------------------------------
+  ОКРУГЛЕНИЕ AXIAL → CUBE
+  ------------------------------------------------------------
+
+  После обратного преобразования координаты дробные.
+  Мы переводим их в cube-пространство и аккуратно округляем,
+  сохраняя инвариант q + r + s = 0.
+*/
 export function axialRound(q: number, r: number): HexCoords {
+
   const s = -q - r;
+
   let rq = Math.round(q);
   let rr = Math.round(r);
   let rs = Math.round(s);
@@ -55,127 +124,40 @@ export function axialRound(q: number, r: number): HexCoords {
   return { q: rq, r: rr, s: rs };
 }
 
+/*
+  ------------------------------------------------------------
+  ГЕОМЕТРИЯ ГЕКСА (Cylinder)
+  ------------------------------------------------------------
+
+  CylinderGeometry с 6 сегментами:
+  - по умолчанию ориентирован "pointy-top"
+  - не требует поворота
+*/
 export function createHexGeometry(): THREE.CylinderGeometry {
-  // Возвращаем к исходному варианту без поворота - как было изначально
-  const geometry = new THREE.CylinderGeometry(HEX_RADIUS, HEX_RADIUS, HEX_HEIGHT, 6);
-  return geometry;
+
+  return new THREE.CylinderGeometry(
+    HEX_RADIUS,   // верхний радиус
+    HEX_RADIUS,   // нижний радиус
+    HEX_HEIGHT,   // высота
+    6,            // сегменты (шестигранник)
+    1,            // heightSegments
+    false         // не полый
+  );
 }
 
+/*
+  ------------------------------------------------------------
+  КАСТОМНАЯ ГЕОМЕТРИЯ С UV
+  ------------------------------------------------------------
+
+  ВАЖНО:
+  - Геометрия использует ТОТ ЖЕ радиус, что и grid
+  - Никаких "компенсаций" в размерах здесь быть не должно
+*/
 export function createHexGeometryWithUV(): THREE.BufferGeometry {
+
   const geometry = new THREE.BufferGeometry();
-  const vertices: number[] = [];
-  const normals: number[] = [];
-  const uvs: number[] = [];
-  const indices: number[] = [];
 
-  const radius = HEX_RADIUS; // Радиус для правильного соприкосновения гранями
-  const height = HEX_HEIGHT;
-  const segments = 6;
-  // Все блоки без поворота - фиксированная ориентация 0 градусов
-
-  // Верхняя грань (верхняя текстура)
-  const topCenterIndex = vertices.length / 3;
-  vertices.push(0, height / 2, 0);
-  normals.push(0, 1, 0);
-  uvs.push(0.5, 0.5); // Центр верхней текстуры
-
-  for (let i = 0; i <= segments; i++) {
-    const angle = (i / segments) * Math.PI * 2;
-    const x = Math.cos(angle) * radius;
-    const z = Math.sin(angle) * radius;
-    vertices.push(x, height / 2, z);
-    normals.push(0, 1, 0);
-    // UV для верхней грани (центр в 0.5, 0.5) - без поворота
-    const uvAngle = (i / segments) * Math.PI * 2;
-    const u = 0.5 + Math.cos(uvAngle) * 0.5;
-    const v = 0.5 + Math.sin(uvAngle) * 0.5;
-    uvs.push(u, v);
-  }
-
-  // Индексы для верхней грани
-  for (let i = 0; i < segments; i++) {
-    indices.push(topCenterIndex, topCenterIndex + i + 1, topCenterIndex + i + 2);
-  }
-
-  // Нижняя грань (нижняя текстура, используем ту же что и боковая)
-  const bottomCenterIndex = vertices.length / 3;
-  vertices.push(0, -height / 2, 0);
-  normals.push(0, -1, 0);
-  uvs.push(0.5, 0.5);
-
-  for (let i = 0; i <= segments; i++) {
-    const angle = (i / segments) * Math.PI * 2;
-    const x = Math.cos(angle) * radius;
-    const z = Math.sin(angle) * radius;
-    vertices.push(x, -height / 2, z);
-    normals.push(0, -1, 0);
-    // UV без поворота для правильного наложения текстуры
-    const uvAngle = (i / segments) * Math.PI * 2;
-    const u = 0.5 + Math.cos(uvAngle) * 0.5;
-    const v = 0.5 + Math.sin(uvAngle) * 0.5;
-    uvs.push(u, v);
-  }
-
-  // Индексы для нижней грани
-  for (let i = 0; i < segments; i++) {
-    indices.push(bottomCenterIndex, bottomCenterIndex + i + 2, bottomCenterIndex + i + 1);
-  }
-
-  // Боковые грани (боковая текстура)
-  const sideStartIndex = vertices.length / 3;
-  for (let i = 0; i <= segments; i++) {
-    const angle = (i / segments) * Math.PI * 2;
-    const x = Math.cos(angle) * radius;
-    const z = Math.sin(angle) * radius;
-    const nextAngle = ((i + 1) % (segments + 1)) / segments * Math.PI * 2;
-    const nextX = Math.cos(nextAngle) * radius;
-    const nextZ = Math.sin(nextAngle) * radius;
-
-    // Верхние вершины
-    vertices.push(x, height / 2, z);
-    normals.push(Math.cos(angle), 0, Math.sin(angle));
-    uvs.push(i / segments, 1);
-
-    // Нижние вершины
-    vertices.push(x, -height / 2, z);
-    normals.push(Math.cos(angle), 0, Math.sin(angle));
-    uvs.push(i / segments, 0);
-
-    // Верхние вершины следующей грани
-    vertices.push(nextX, height / 2, nextZ);
-    normals.push(Math.cos(nextAngle), 0, Math.sin(nextAngle));
-    uvs.push((i + 1) / segments, 1);
-
-    // Нижние вершины следующей грани
-    vertices.push(nextX, -height / 2, nextZ);
-    normals.push(Math.cos(nextAngle), 0, Math.sin(nextAngle));
-    uvs.push((i + 1) / segments, 0);
-
-    const baseIdx = sideStartIndex + i * 4;
-    indices.push(baseIdx, baseIdx + 1, baseIdx + 2);
-    indices.push(baseIdx + 1, baseIdx + 3, baseIdx + 2);
-  }
-
-  geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
-  geometry.setAttribute('normal', new THREE.Float32BufferAttribute(normals, 3));
-  geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
-  geometry.setIndex(indices);
-  geometry.computeBoundingSphere();
-
-  return geometry;
-}
-
-// Создаёт геометрию для grass блоков с правильными UV координатами для верхней и боковых граней
-// Использует стандартное наложение текстур через UV координаты
-export function createGrassHexGeometryWithUV(
-  topTextureRow: number, 
-  topTextureCol: number, 
-  sideTextureRow: number, 
-  sideTextureCol: number,
-  atlasRows: number = 4,
-  atlasCols: number = 10
-): THREE.BufferGeometry {
-  const geometry = new THREE.BufferGeometry();
   const vertices: number[] = [];
   const normals: number[] = [];
   const uvs: number[] = [];
@@ -185,77 +167,123 @@ export function createGrassHexGeometryWithUV(
   const height = HEX_HEIGHT;
   const segments = 6;
 
-  // Вычисляем UV координаты для текстур в атласе
-  // В Three.js при использовании TextureLoader V координата автоматически инвертируется
-  // Но при использовании атласа напрямую нужно учитывать, что (0,0) - левый верхний угол
-  // Row 0 находится вверху изображения, поэтому V координаты идут сверху вниз
-  const topUStart = topTextureCol / atlasCols;
-  const topVStart = topTextureRow / atlasRows; // Row 0 -> V = 0, Row 1 -> V = 0.25 и т.д.
-  const topUEnd = (topTextureCol + 1) / atlasCols;
-  const topVEnd = (topTextureRow + 1) / atlasRows;
+  /*
+    -------------------------
+    ВЕРХНЯЯ ГРАНЬ
+    -------------------------
+  */
 
-  const sideUStart = sideTextureCol / atlasCols;
-  const sideVStart = sideTextureRow / atlasRows; // Row 0 -> V = 0
-  const sideUEnd = (sideTextureCol + 1) / atlasCols;
-  const sideVEnd = (sideTextureRow + 1) / atlasRows;
-
-  // Верхняя грань (верхняя текстура из атласа)
   const topCenterIndex = vertices.length / 3;
   vertices.push(0, height / 2, 0);
   normals.push(0, 1, 0);
-  uvs.push((topUStart + topUEnd) / 2, (topVStart + topVEnd) / 2); // Центр текстуры
+  uvs.push(0.5, 0.5);
 
   for (let i = 0; i <= segments; i++) {
     const angle = (i / segments) * Math.PI * 2;
     const x = Math.cos(angle) * radius;
     const z = Math.sin(angle) * radius;
+
     vertices.push(x, height / 2, z);
     normals.push(0, 1, 0);
-    // UV для верхней грани - маппинг на topTexture в атласе
-    const uvAngle = (i / segments) * Math.PI * 2;
-    const u = (topUStart + topUEnd) / 2 + Math.cos(uvAngle) * (topUEnd - topUStart) / 2;
-    const v = (topVStart + topVEnd) / 2 + Math.sin(uvAngle) * (topVEnd - topVStart) / 2;
-    uvs.push(u, v);
+
+    uvs.push(
+      0.5 + Math.cos(angle) * 0.5,
+      0.5 + Math.sin(angle) * 0.5
+    );
   }
 
-  // Индексы для верхней грани
   for (let i = 0; i < segments; i++) {
-    indices.push(topCenterIndex, topCenterIndex + i + 1, topCenterIndex + i + 2);
+    indices.push(
+      topCenterIndex,
+      topCenterIndex + i + 1,
+      topCenterIndex + i + 2
+    );
   }
 
-  // Нижняя грань (используем sideTexture)
+  /*
+    -------------------------
+    НИЖНЯЯ ГРАНЬ
+    -------------------------
+  */
+
   const bottomCenterIndex = vertices.length / 3;
   vertices.push(0, -height / 2, 0);
   normals.push(0, -1, 0);
-  uvs.push((sideUStart + sideUEnd) / 2, (sideVStart + sideVEnd) / 2);
+  uvs.push(0.5, 0.5);
 
   for (let i = 0; i <= segments; i++) {
     const angle = (i / segments) * Math.PI * 2;
     const x = Math.cos(angle) * radius;
     const z = Math.sin(angle) * radius;
+
     vertices.push(x, -height / 2, z);
     normals.push(0, -1, 0);
-    // UV для нижней грани - маппинг на sideTexture в атласе
-    const uvAngle = (i / segments) * Math.PI * 2;
-    const u = (sideUStart + sideUEnd) / 2 + Math.cos(uvAngle) * (sideUEnd - sideUStart) / 2;
-    const v = (sideVStart + sideVEnd) / 2 + Math.sin(uvAngle) * (sideVEnd - sideVStart) / 2;
-    uvs.push(u, v);
+
+    uvs.push(
+      0.5 + Math.cos(angle) * 0.5,
+      0.5 + Math.sin(angle) * 0.5
+    );
   }
 
-  // Индексы для нижней грани
   for (let i = 0; i < segments; i++) {
-    indices.push(bottomCenterIndex, bottomCenterIndex + i + 2, bottomCenterIndex + i + 1);
+    indices.push(
+      bottomCenterIndex,
+      bottomCenterIndex + i + 2,
+      bottomCenterIndex + i + 1
+    );
   }
 
-  // Боковые грани (боковая текстура из атласа)
+  /*
+    -------------------------
+    БОКОВЫЕ ГРАНИ
+    -------------------------
+  */
+
   const sideStartIndex = vertices.length / 3;
+
   for (let i = 0; i <= segments; i++) {
     const angle = (i / segments) * Math.PI * 2;
     const x = Math.cos(angle) * radius;
     const z = Math.sin(angle) * radius;
-    const nextAngle = ((i + 1) % (segments + 1)) / segments * Math.PI * 2;
-    const nextX = Math.cos(nextAngle) * radius;
-    const nextZ = Math.sin(nextAngle) * radius;
+
+    vertices.push(x,  height / 2, z);
+    vertices.push(x, -height / 2, z);
+
+    const nx = Math.cos(angle);
+    const nz = Math.sin(angle);
+
+    normals.push(nx, 0, nz);
+    normals.push(nx, 0, nz);
+
+    uvs.push(i / segments, 1);
+    uvs.push(i / segments, 0);
+  }
+
+  for (let i = 0; i < segments; i++) {
+    const a = sideStartIndex + i * 2;
+    const b = a + 1;
+    const c = a + 2;
+    const d = a + 3;
+
+    indices.push(a, b, c);
+    indices.push(b, d, c);
+  }
+
+  /*
+    -------------------------
+    ФИНАЛИЗАЦИЯ
+    -------------------------
+  */
+
+  geometry.setIndex(indices);
+  geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
+  geometry.setAttribute('normal', new THREE.Float32BufferAttribute(normals, 3));
+  geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
+
+  geometry.computeBoundingSphere();
+
+  return geometry;
+}
 
     // Верхние вершины боковой грани
     vertices.push(x, height / 2, z);
@@ -299,10 +327,53 @@ export function getChunkKey(q: number, r: number): string {
   return `${q},${r}`;
 }
 
-export function worldToChunk(x: number, z: number, chunkSize: number = 14): { q: number; r: number } {
+/*
+  Деление для координатной сетки чанков.
+
+  Отличие от Math.floor:
+  - работает СИММЕТРИЧНО относительно нуля
+  - гарантирует, что (0,0) лежит ВНУТРИ чанка (0,0)
+  - корректно обрабатывает отрицательные координаты
+
+  Используется ТОЛЬКО для grid / chunk логики.
+*/
+function divFloor(a: number, b: number): number {
+
+  // Для положительных координат —
+  // обычное деление с округлением вниз
+  if (a >= 0) {
+    return Math.floor(a / b);
+  }
+
+  // Для отрицательных координат:
+  // компенсируем поведение Math.floor,
+  // чтобы чанки были симметричны
+  return Math.floor((a - b + 1) / b);
+}
+
+/*
+  ------------------------------------------------------------
+  WORLD → CHUNK
+  ------------------------------------------------------------
+
+  1. Определяем hex под мировой координатой
+  2. Делим axial-координаты на размер чанка
+  3. Используем divFloor для симметрии
+
+  chunkSize — радиус чанка в гексах (не в метрах!)
+*/
+export function worldToChunk(
+  x: number,
+  z: number,
+  chunkSize: number = 14
+): { q: number; r: number } {
+
+  // Преобразуем world → hex
   const hex = worldToHex(x, z);
+
+  // Преобразуем hex → chunk
   return {
-    q: Math.floor(hex.q / chunkSize),
-    r: Math.floor(hex.r / chunkSize)
+    q: divFloor(hex.q, chunkSize),
+    r: divFloor(hex.r, chunkSize)
   };
 }
