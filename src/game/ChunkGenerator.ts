@@ -142,7 +142,7 @@ export class ChunkGenerator {
       minHeight: 8,
       maxHeight: 16,
       heightVariation: 6,
-      treeMultiplier: 0.7
+      treeMultiplier: 0.42 // Уменьшено с 0.7 до 0.42 (уменьшение на 40%)
     });
 
     this.biomeConfigs.set('darkforest', {

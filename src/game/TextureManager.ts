@@ -13,7 +13,7 @@ export interface TextureAtlasConfig {
   atlasSize: number; // 320
   tileSize: number; // 32
   rows: number; // 4
-  cols: number; // 10
+  cols: number; // 12
 }
 
 export interface BlockTextureConfig {
@@ -224,6 +224,7 @@ export class TextureManager {
     }
 
     const image = this.atlasTexture.image as HTMLImageElement;
+
     const canvas = document.createElement('canvas');
     canvas.width = this.config.tileSize;
     canvas.height = this.config.tileSize;
@@ -243,12 +244,26 @@ export class TextureManager {
     
     // Убеждаемся, что альфа-канал правильный для непрозрачных текстур
     // Исправляем пиксели с низким альфа-каналом (артефакты сжатия)
+    // НО только для непрозрачных текстур - для прозрачных блоков сохраняем оригинальный альфа
     const data = imageData.data;
+    // Проверяем, является ли текстура в основном непрозрачной (для автоматического определения)
+    let transparentPixels = 0;
     for (let i = 3; i < data.length; i += 4) {
-      // Если альфа-канал очень маленький (прозрачный пиксель), устанавливаем его в 255 (непрозрачный)
-      // Это предотвращает случайную прозрачность из-за артефактов сжатия или неправильной обработки
       if (data[i] < 128) {
-        data[i] = 255;
+        transparentPixels++;
+      }
+    }
+    const isMostlyTransparent = transparentPixels > (data.length / 4) * 0.3; // Если больше 30% прозрачных пикселей
+    
+    // Исправляем альфа только для непрозрачных текстур
+    if (!isMostlyTransparent) {
+      for (let i = 3; i < data.length; i += 4) {
+        // Если альфа-канал очень маленький (прозрачный пиксель), устанавливаем его в 255 (непрозрачный)
+        // Это предотвращает случайную прозрачность из-за артефактов сжатия или неправильной обработки
+        // Используем порог 200 вместо 128 для более надежной обработки
+        if (data[i] < 200) {
+          data[i] = 255;
+        }
       }
     }
 
@@ -306,15 +321,30 @@ export class TextureManager {
     const texturesDifferent = hasTopTexture && (config.top.row !== config.side.row || config.top.col !== config.side.col);
     
     // Включаем прозрачность только если она явно задана в конфиге
-    // Для leaves, water, ice, lava всегда включаем прозрачность
+    // Для leaves, water, ice, lava, pine, aetherleaf всегда включаем прозрачность
     // Для остальных блоков прозрачность определяется только конфигом
-    const shouldBeTransparent = (config.transparent === true) || blockId === 'leaves' || blockId === 'water' || blockId === 'ice' || blockId === 'lava';
+    const shouldBeTransparent = (config.transparent === true) || 
+                                blockId === 'leaves' || 
+                                blockId === 'water' || 
+                                blockId === 'ice' || 
+                                blockId === 'lava' ||
+                                blockId === 'pine' ||
+                                blockId === 'aetherleaf';
     
     // Для всех блоков с разными текстурами используем кастомный шейдер
     if (texturesDifferent) {
       return this.createDualTextureMaterial(topTexture, sideTexture, config, shouldBeTransparent);
     } else {
       // Если текстуры одинаковые или top не задан, используем side для всех граней
+      // Проверяем, что текстура загружена
+      if (!sideTexture) {
+        console.warn(`[TextureManager] Failed to load texture for block: ${blockId}`);
+        return new THREE.MeshLambertMaterial({
+          color: 0xff00ff, // Фиолетовый цвет для блоков без текстуры
+          side: THREE.DoubleSide
+        });
+      }
+
       const material = new THREE.MeshLambertMaterial({
         map: sideTexture,
         transparent: shouldBeTransparent,
@@ -371,21 +401,24 @@ export class TextureManager {
         // Смешиваем текстуры в зависимости от нормали с плавным переходом
         vec4 color = mix(sideColor, topColor, smoothstep(0.7, 1.0, topFactor));
         
+        // Для непрозрачных блоков игнорируем альфа-канал из текстуры и устанавливаем альфа = 1.0
+        // Это гарантирует, что блок будет полностью непрозрачным
+        if (!isTransparent) {
+          color.a = 1.0;
+        }
+        
         // Lambert освещение
         vec3 lightDir = normalize(directionalLightDirection);
         float NdotL = max(dot(vWorldNormal, lightDir), 0.0);
         vec3 lighting = ambientLightColor + directionalLightColor * NdotL;
         color.rgb *= lighting;
         
-        // Для непрозрачных блоков всегда устанавливаем альфа = 1.0
-        // Для прозрачных блоков используем альфа из текстуры, умноженный на opacity
-        float finalAlpha;
-        if (isTransparent) {
-          // Прозрачный блок - используем альфа из текстуры с учетом opacity
-          finalAlpha = color.a * opacity;
-        } else {
-          // Непрозрачный блок - всегда альфа = 1.0, игнорируем альфа-канал из текстуры
-          finalAlpha = 1.0;
+        // Для прозрачных блоков применяем opacity
+        float finalAlpha = isTransparent ? color.a * opacity : 1.0;
+        
+        // Для непрозрачных блоков отбрасываем пиксели с очень низкой альфой (артефакты сжатия)
+        if (!isTransparent && color.a < 0.5) {
+          discard;
         }
         
         gl_FragColor = vec4(color.rgb, finalAlpha);
@@ -406,7 +439,7 @@ export class TextureManager {
       fragmentShader,
       transparent: transparent,
       side: THREE.DoubleSide, // Всегда DoubleSide для правильного отображения с обеих сторон
-      alphaTest: transparent ? 0.1 : 0.5 // Для непрозрачных блоков используем alphaTest для отбрасывания прозрачных пикселей
+      alphaTest: transparent ? 0.1 : 0.0 // Для непрозрачных блоков не используем alphaTest (обрабатывается в шейдере через discard)
     });
 
     return material;
