@@ -112,6 +112,7 @@ const DEFAULT_GENERATION_CONFIG: GenerationConfig = {
   }
 };
 
+export class ChunkGenerator {
   private chunkSize: number;
   private seed: number;
   private biomeConfigs: Map<string, BiomeConfig> = new Map();
@@ -443,7 +444,8 @@ const DEFAULT_GENERATION_CONFIG: GenerationConfig = {
           const surfaceBlock = blockMap.get(surfaceBlockKey);
           const hasTree = surfaceBlock && ['grassland', 'darkforest', 'aether'].includes(biome);
 
-          if (hasTree && surfaceBlock && surfaceBlock.type === biomeConfig.surfaceBlock) {
+          const biomeConfig = this.biomeConfigs.get(biome);
+          if (hasTree && surfaceBlock && biomeConfig && surfaceBlock.type === biomeConfig.surfaceBlock) {
             const treeNoise = this.simpleNoise(worldQ * 0.1, worldR * 0.1);
             const treeProbability = Math.max(
               0.04,
@@ -631,6 +633,7 @@ const DEFAULT_GENERATION_CONFIG: GenerationConfig = {
     return (sin - Math.floor(sin));
   }
 
+  // Метод для будущей функциональности генерации пещер (enableCaves в конфиге)
   private caveNoise3D(x: number, y: number, z: number): number {
     const noise1 = this.simpleNoise(x, y + z);
     const noise2 = this.simpleNoise(x * 2, y * 2 + z * 2);
@@ -640,5 +643,286 @@ const DEFAULT_GENERATION_CONFIG: GenerationConfig = {
 
   getSeed(): number {
     return this.seed;
+  }
+
+  private placeTree(
+    q: number,
+    r: number,
+    startY: number,
+    trunkHeight: number,
+    trunkBlock: string,
+    leavesBlock: string,
+    canopyLayers: { y: number; radius: number }[],
+    blockMap: Map<string, Block>,
+    blocks: Block[],
+    maxY: number
+  ): void {
+    const s = -q - r;
+
+    // Ствол
+    for (let y = startY; y < startY + trunkHeight && y < maxY; y++) {
+      const trunkKey = `${q},${r},${y}`;
+      if (!blockMap.has(trunkKey)) {
+        const trunkBlockObj: Block = {
+          type: trunkBlock,
+          position: { q, r, s, y }
+        };
+        blocks.push(trunkBlockObj);
+        blockMap.set(trunkKey, trunkBlockObj);
+      }
+    }
+
+    // Крона
+    const hexNeighbors = [
+      { q: 1, r: 0 }, { q: -1, r: 0 },
+      { q: 0, r: 1 }, { q: 0, r: -1 },
+      { q: 1, r: -1 }, { q: -1, r: 1 }
+    ];
+
+    for (const layer of canopyLayers) {
+      if (layer.y >= maxY) continue;
+
+      // Центральный блок кроны
+      const centerKey = `${q},${r},${layer.y}`;
+      if (!blockMap.has(centerKey)) {
+        const centerBlock: Block = {
+          type: leavesBlock,
+          position: { q, r, s, y: layer.y }
+        };
+        blocks.push(centerBlock);
+        blockMap.set(centerKey, centerBlock);
+      }
+
+      // Соседи в радиусе
+      for (let radius = 1; radius <= layer.radius; radius++) {
+        for (const neighbor of hexNeighbors) {
+          const neighborQ = q + neighbor.q * radius;
+          const neighborR = r + neighbor.r * radius;
+          const neighborS = -neighborQ - neighborR;
+          const neighborKey = `${neighborQ},${neighborR},${layer.y}`;
+
+          if (!blockMap.has(neighborKey)) {
+            const neighborBlock: Block = {
+              type: leavesBlock,
+              position: { q: neighborQ, r: neighborR, s: neighborS, y: layer.y }
+            };
+            blocks.push(neighborBlock);
+            blockMap.set(neighborKey, neighborBlock);
+          }
+        }
+      }
+    }
+  }
+
+  private ensureDarkForestAdjacency(biomeMap: Map<string, string>): void {
+    const darkForestCells: string[] = [];
+    const grasslandCells: string[] = [];
+
+    for (const [key, biome] of biomeMap.entries()) {
+      if (biome === 'darkforest') {
+        darkForestCells.push(key);
+      } else if (biome === 'grassland') {
+        grasslandCells.push(key);
+      }
+    }
+
+    if (darkForestCells.length === 0 || grasslandCells.length === 0) {
+      return;
+    }
+
+    const hexNeighbors = [
+      { q: 1, r: 0 }, { q: -1, r: 0 },
+      { q: 0, r: 1 }, { q: 0, r: -1 },
+      { q: 1, r: -1 }, { q: -1, r: 1 }
+    ];
+
+    for (const darkForestKey of darkForestCells) {
+      const [qStr, rStr] = darkForestKey.split(',');
+      const q = parseInt(qStr, 10);
+      const r = parseInt(rStr, 10);
+
+      let hasGrasslandNeighbor = false;
+      for (const neighbor of hexNeighbors) {
+        const neighborQ = q + neighbor.q;
+        const neighborR = r + neighbor.r;
+        const neighborKey = `${neighborQ},${neighborR}`;
+        const neighborBiome = biomeMap.get(neighborKey);
+
+        if (neighborBiome === 'grassland') {
+          hasGrasslandNeighbor = true;
+          break;
+        }
+      }
+
+      if (!hasGrasslandNeighbor && grasslandCells.length > 0) {
+        const closestNeighbor = hexNeighbors.find(neighbor => {
+          const neighborQ = q + neighbor.q;
+          const neighborR = r + neighbor.r;
+          const neighborKey = `${neighborQ},${neighborR}`;
+          return !biomeMap.has(neighborKey) || biomeMap.get(neighborKey) !== 'darkforest';
+        });
+
+        if (closestNeighbor) {
+          const borderQ = q + closestNeighbor.q;
+          const borderR = r + closestNeighbor.r;
+          const borderKey = `${borderQ},${borderR}`;
+          if (!biomeMap.has(borderKey) || biomeMap.get(borderKey) !== 'darkforest') {
+            biomeMap.set(borderKey, 'grassland');
+          }
+        }
+      }
+    }
+  }
+
+  private generateFooStructure(
+    chunkQ: number,
+    chunkR: number,
+    heightMap: Map<string, number>,
+    blockMap: Map<string, Block>,
+    blocks: Block[]
+  ): void {
+    const offsetQ = chunkQ * this.chunkSize;
+    const offsetR = chunkR * this.chunkSize;
+    const centerQ = offsetQ + Math.floor(this.chunkSize / 2);
+    const centerR = offsetR + Math.floor(this.chunkSize / 2);
+    const centerKey = `${Math.floor(this.chunkSize / 2)},${Math.floor(this.chunkSize / 2)}`;
+    const surfaceHeight = heightMap.get(centerKey) || 10;
+    const y = surfaceHeight + 1;
+
+    const hexNeighbors = [
+      { q: 1, r: 0 }, { q: -1, r: 0 },
+      { q: 0, r: 1 }, { q: 0, r: -1 },
+      { q: 1, r: -1 }, { q: -1, r: 1 }
+    ];
+
+    const centerS = -centerQ - centerR;
+    const centerBlockKey = `${centerQ},${centerR},${y}`;
+    if (!blockMap.has(centerBlockKey)) {
+      const centerBlock: Block = {
+        type: 'foo',
+        position: { q: centerQ, r: centerR, s: centerS, y }
+      };
+      blocks.push(centerBlock);
+      blockMap.set(centerBlockKey, centerBlock);
+    }
+
+    for (const neighbor of hexNeighbors) {
+      const neighborQ = centerQ + neighbor.q;
+      const neighborR = centerR + neighbor.r;
+      const neighborS = -neighborQ - neighborR;
+      const neighborKey = `${neighborQ},${neighborR},${y}`;
+
+      if (!blockMap.has(neighborKey)) {
+        const neighborBlock: Block = {
+          type: 'foo',
+          position: { q: neighborQ, r: neighborR, s: neighborS, y }
+        };
+        blocks.push(neighborBlock);
+        blockMap.set(neighborKey, neighborBlock);
+      }
+    }
+  }
+
+  private generateCaveTunnel(
+    chunkQ: number,
+    chunkR: number,
+    heightMap: Map<string, number>,
+    blockMap: Map<string, Block>,
+    blocks: Block[]
+  ): void {
+    if (!this.config.enableCaves || !this.config.caves.enabled) {
+      return;
+    }
+
+    const offsetQ = chunkQ * this.chunkSize;
+    const offsetR = chunkR * this.chunkSize;
+    const centerQ = offsetQ + Math.floor(this.chunkSize / 2);
+    const centerR = offsetR + Math.floor(this.chunkSize / 2);
+    const centerKey = `${Math.floor(this.chunkSize / 2)},${Math.floor(this.chunkSize / 2)}`;
+    const surfaceHeight = heightMap.get(centerKey) || 10;
+    const tunnelY = Math.max(0, surfaceHeight - 2);
+
+    const hexNeighbors = [
+      { q: 1, r: 0 }, { q: -1, r: 0 },
+      { q: 0, r: 1 }, { q: 0, r: -1 },
+      { q: 1, r: -1 }, { q: -1, r: 1 }
+    ];
+
+    let currentQ = centerQ;
+    let currentR = centerR;
+    const tunnelLength = 6;
+
+    for (let i = 0; i < tunnelLength; i++) {
+      const currentS = -currentQ - currentR;
+      const tunnelKey = `${currentQ},${currentR},${tunnelY}`;
+      const existingBlock = blockMap.get(tunnelKey);
+
+      if (existingBlock && existingBlock.type !== 'water' && existingBlock.type !== 'lava') {
+        existingBlock.type = 'foo';
+      } else if (!blockMap.has(tunnelKey)) {
+        const tunnelBlock: Block = {
+          type: 'foo',
+          position: { q: currentQ, r: currentR, s: currentS, y: tunnelY }
+        };
+        blocks.push(tunnelBlock);
+        blockMap.set(tunnelKey, tunnelBlock);
+      }
+
+      const randomNeighbor = hexNeighbors[Math.floor(Math.random() * hexNeighbors.length)];
+      currentQ += randomNeighbor.q;
+      currentR += randomNeighbor.r;
+    }
+  }
+
+  private generateWoodenPlatform(
+    chunkQ: number,
+    chunkR: number,
+    heightMap: Map<string, number>,
+    blockMap: Map<string, Block>,
+    blocks: Block[]
+  ): void {
+    const offsetQ = chunkQ * this.chunkSize;
+    const offsetR = chunkR * this.chunkSize;
+    const centerQ = offsetQ + Math.floor(this.chunkSize / 2);
+    const centerR = offsetR + Math.floor(this.chunkSize / 2);
+    const centerKey = `${Math.floor(this.chunkSize / 2)},${Math.floor(this.chunkSize / 2)}`;
+    const surfaceHeight = heightMap.get(centerKey) || 10;
+    const y = surfaceHeight + 2;
+
+    const hexNeighbors = [
+      { q: 1, r: 0 }, { q: -1, r: 0 },
+      { q: 0, r: 1 }, { q: 0, r: -1 },
+      { q: 1, r: -1 }, { q: -1, r: 1 }
+    ];
+
+    const centerS = -centerQ - centerR;
+    const centerBlockKey = `${centerQ},${centerR},${y}`;
+    if (!blockMap.has(centerBlockKey)) {
+      const centerBlock: Block = {
+        type: 'foo',
+        position: { q: centerQ, r: centerR, s: centerS, y }
+      };
+      blocks.push(centerBlock);
+      blockMap.set(centerBlockKey, centerBlock);
+    }
+
+    const radius = 2;
+    for (let r = 1; r <= radius; r++) {
+      for (const neighbor of hexNeighbors) {
+        const neighborQ = centerQ + neighbor.q * r;
+        const neighborR = centerR + neighbor.r * r;
+        const neighborS = -neighborQ - neighborR;
+        const neighborKey = `${neighborQ},${neighborR},${y}`;
+
+        if (!blockMap.has(neighborKey)) {
+          const neighborBlock: Block = {
+            type: 'wood',
+            position: { q: neighborQ, r: neighborR, s: neighborS, y }
+          };
+          blocks.push(neighborBlock);
+          blockMap.set(neighborKey, neighborBlock);
+        }
+      }
+    }
   }
 }
