@@ -79,7 +79,7 @@ export class World {
       atlasSize: 320,
       tileSize: 32,
       rows: 4,
-      cols: 10
+      cols: 12
     });
 
     const texturePath = new URL('./texutres.png', import.meta.url).href;

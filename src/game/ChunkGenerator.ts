@@ -7,6 +7,7 @@ interface BiomeConfig {
   minHeight: number;
   maxHeight: number;
   heightVariation: number;
+  treeMultiplier?: number;
 }
 
 export interface GenerationConfig {
@@ -155,6 +156,176 @@ const DEFAULT_GENERATION_CONFIG: GenerationConfig = {
       blockMap.set(fooKey, fooBlock);
     }
   }
+
+  private generateCaveTunnel(
+    chunkQ: number,
+    chunkR: number,
+    heightMap: Map<string, number>,
+    blockMap: Map<string, Block>,
+    blocks: Block[]
+  ): void {
+    const pathLength = 6;
+    const startLocalQ = Math.floor(this.chunkSize / 2);
+    const startLocalR = Math.floor(this.chunkSize / 2);
+    const directions = [
+      { dq: 1, dr: 0 },
+      { dq: -1, dr: 0 },
+      { dq: 0, dr: 1 },
+      { dq: 0, dr: -1 },
+      { dq: 1, dr: -1 },
+      { dq: -1, dr: 1 }
+    ];
+
+    let currentQ = startLocalQ;
+    let currentR = startLocalR;
+
+    for (let i = 0; i < pathLength; i++) {
+      const offset = directions[Math.floor(Math.random() * directions.length)];
+      currentQ = Math.min(Math.max(currentQ + offset.dq, 0), this.chunkSize - 1);
+      currentR = Math.min(Math.max(currentR + offset.dr, 0), this.chunkSize - 1);
+
+      const surfaceHeight = heightMap.get(`${currentQ},${currentR}`);
+      if (surfaceHeight === undefined) continue;
+
+      const worldQ = chunkQ * this.chunkSize + currentQ;
+      const worldR = chunkR * this.chunkSize + currentR;
+      const targetY = Math.max(surfaceHeight - 2, 0);
+      const key = `${worldQ},${worldR},${targetY}`;
+      if (blockMap.has(key)) continue;
+
+      const caveBlock: Block = {
+        type: 'foo',
+        position: { q: worldQ, r: worldR, s: -worldQ - worldR, y: targetY }
+      };
+      blocks.push(caveBlock);
+      blockMap.set(key, caveBlock);
+    }
+  }
+
+  private generateWoodenPlatform(
+    chunkQ: number,
+    chunkR: number,
+    heightMap: Map<string, number>,
+    blockMap: Map<string, Block>,
+    blocks: Block[]
+  ): void {
+    const platformRadius = 2;
+    const centerQ = Math.floor(this.chunkSize / 2);
+    const centerR = Math.floor(this.chunkSize / 2);
+
+    const offsets = [{ dq: 0, dr: 0 }];
+    for (let dq = -platformRadius; dq <= platformRadius; dq++) {
+      for (let dr = Math.max(-platformRadius, -dq - platformRadius); dr <= Math.min(platformRadius, -dq + platformRadius); dr++) {
+        offsets.push({ dq, dr });
+      }
+    }
+
+    const surfaceHeight = heightMap.get(`${centerQ},${centerR}`);
+    if (surfaceHeight === undefined) return;
+    const platformY = surfaceHeight + 1;
+
+    offsets.forEach(offset => {
+      const localQ = centerQ + offset.dq;
+      const localR = centerR + offset.dr;
+      if (localQ < 0 || localQ >= this.chunkSize || localR < 0 || localR >= this.chunkSize) return;
+
+      const worldQ = chunkQ * this.chunkSize + localQ;
+      const worldR = chunkR * this.chunkSize + localR;
+      const key = `${worldQ},${worldR},${platformY}`;
+      if (blockMap.has(key)) return;
+
+      const material = offset.dq === 0 && offset.dr === 0 ? 'foo' : 'wood';
+      const platformBlock: Block = {
+        type: material,
+        position: { q: worldQ, r: worldR, s: -worldQ - worldR, y: platformY }
+      };
+      blocks.push(platformBlock);
+      blockMap.set(key, platformBlock);
+    });
+  }
+
+  private ensureDarkForestAdjacency(biomeMap: Map<string, string>): void {
+    const directions = [
+      { dq: 1, dr: 0 },
+      { dq: -1, dr: 0 },
+      { dq: 0, dr: 1 },
+      { dq: 0, dr: -1 },
+      { dq: 1, dr: -1 },
+      { dq: -1, dr: 1 }
+    ];
+
+    for (let q = 0; q < this.chunkSize; q++) {
+      for (let r = 0; r < this.chunkSize; r++) {
+        const key = `${q},${r}`;
+        if (biomeMap.get(key) !== 'darkforest') continue;
+
+        const grassNeighbors = directions.reduce((count, offset) => {
+          const neighborKey = `${q + offset.dq},${r + offset.dr}`;
+          if (biomeMap.get(neighborKey) === 'grassland') {
+            return count + 1;
+          }
+          return count;
+        }, 0);
+
+        if (grassNeighbors < 4) {
+          biomeMap.set(key, 'grassland');
+        }
+      }
+    }
+  }
+
+  private placeTree(
+    worldQ: number,
+    worldR: number,
+    startY: number,
+    trunkHeight: number,
+    trunkBlock: string,
+    leafBlock: string,
+    canopyLayers: Array<{ y: number; radius: number }>,
+    blockMap: Map<string, Block>,
+    blocks: Block[],
+    maxY: number
+  ): void {
+    // Ствол
+    for (let i = 0; i < trunkHeight && startY + i < maxY; i++) {
+      const trunkY = startY + i;
+      const trunkKey = `${worldQ},${worldR},${trunkY}`;
+
+      if (!blockMap.has(trunkKey)) {
+        const treeBlock: Block = {
+          type: trunkBlock,
+          position: { q: worldQ, r: worldR, s: -worldQ - worldR, y: trunkY }
+        };
+        blocks.push(treeBlock);
+        blockMap.set(trunkKey, treeBlock);
+      }
+    }
+
+    // Навес
+    for (const layer of canopyLayers) {
+      if (layer.y >= maxY || layer.y < 0) continue;
+
+      for (let dq = -layer.radius; dq <= layer.radius; dq++) {
+        for (let dr = -layer.radius; dr <= layer.radius; dr++) {
+          const dist = Math.sqrt(dq * dq + dr * dr);
+          if (dist > layer.radius) continue;
+
+          const leafQ = worldQ + dq;
+          const leafR = worldR + dr;
+          const leafKey = `${leafQ},${leafR},${layer.y}`;
+
+          if (!blockMap.has(leafKey)) {
+            const leafBlockInstance: Block = {
+              type: leafBlock,
+              position: { q: leafQ, r: leafR, s: -leafQ - leafR, y: layer.y }
+            };
+            blocks.push(leafBlockInstance);
+            blockMap.set(leafKey, leafBlockInstance);
+          }
+        }
+      }
+    }
+  }
 };
 
 export class ChunkGenerator {
@@ -186,7 +357,22 @@ export class ChunkGenerator {
       structures: ['tree', 'mushroom'],
       minHeight: 8,
       maxHeight: 16,
-      heightVariation: 6
+      heightVariation: 6,
+      treeMultiplier: 0.7
+    });
+
+    this.biomeConfigs.set('darkforest', {
+      surfaceBlock: 'grass',
+      subsurfaceLayers: [
+        { depth: 1, block: 'grass' },
+        { depth: 3, block: 'dirt' },
+        { depth: Infinity, block: 'stone' }
+      ],
+      structures: ['tree'],
+      minHeight: 10,
+      maxHeight: 18,
+      heightVariation: 7,
+      treeMultiplier: 1.3
     });
 
     this.biomeConfigs.set('desert', {
@@ -223,6 +409,19 @@ export class ChunkGenerator {
       minHeight: 6,
       maxHeight: 12,
       heightVariation: 4
+    });
+
+    this.biomeConfigs.set('aether', {
+      surfaceBlock: 'aethergrass',
+      subsurfaceLayers: [
+        { depth: 1, block: 'aethergrass' },
+        { depth: Infinity, block: 'aetherstone' }
+      ],
+      structures: ['aetherTree'],
+      minHeight: 10,
+      maxHeight: 20,
+      heightVariation: 6,
+      treeMultiplier: 0.5
     });
 
     this.biomeConfigs.set('stone', {
@@ -344,6 +543,12 @@ export class ChunkGenerator {
 
             if (!block || block.type !== 'stone') continue;
 
+          const currentBiome = biomeMap.get(`${q},${r}`);
+          if (currentBiome === 'aether' && block.type === 'stone') {
+            block.type = Math.random() < 0.5 ? 'crystal' : 'aetherstone';
+            continue;
+          }
+
             const maxDepth = baseStoneDepth;
             const depthFactor = (maxDepth - y) / maxDepth;
 
@@ -376,6 +581,9 @@ export class ChunkGenerator {
         }
       }
     }
+
+    // После высотной обработки убедимся, что darkforest окружён grassland
+    this.ensureDarkForestAdjacency(biomeMap);
 
     // Поверхностные слои
     for (let q = 0; q < this.chunkSize; q++) {
@@ -448,83 +656,60 @@ export class ChunkGenerator {
           const structureKey = `${worldQ},${worldR}`;
           if (structureMap.has(structureKey)) continue;
 
-          if (biome === 'grassland') {
-            const surfaceBlockKey = `${worldQ},${worldR},${surfaceHeight}`;
-            const surfaceBlock = blockMap.get(surfaceBlockKey);
+          const surfaceBlockKey = `${worldQ},${worldR},${surfaceHeight}`;
+          const surfaceBlock = blockMap.get(surfaceBlockKey);
+          const hasTree = surfaceBlock && ['grassland', 'darkforest', 'aether'].includes(biome);
 
-            if (surfaceBlock && surfaceBlock.type === 'grass') {
-              const treeNoise = this.simpleNoise(worldQ * 0.1, worldR * 0.1);
-              const treeProbability = Math.max(0.05, this.config.structures.trees.chance * 0.3);
+          if (hasTree && surfaceBlock && surfaceBlock.type === biomeConfig.surfaceBlock) {
+            const treeNoise = this.simpleNoise(worldQ * 0.1, worldR * 0.1);
+            const treeProbability = Math.max(
+              0.04,
+              this.config.structures.trees.chance * (biomeConfig.treeMultiplier ?? 1)
+            );
 
-              if (treeNoise > (1 - treeProbability)) {
-                // Генерируем дерево с многослойным навесом
-                const heightRange = this.config.structures.trees.maxHeight - this.config.structures.trees.minHeight;
-                const trunkHeight = this.config.structures.trees.minHeight + Math.floor(this.simpleNoise(worldQ * 0.2, worldR * 0.2) * heightRange);
+            if (treeNoise > (1 - treeProbability)) {
+              const heightRange = this.config.structures.trees.maxHeight - this.config.structures.trees.minHeight;
+              const trunkHeight = this.config.structures.trees.minHeight + Math.floor(this.simpleNoise(worldQ * 0.2, worldR * 0.2) * heightRange);
 
-                // Ствол начинается с surfaceHeight + 1 (над поверхностью)
-                // Но нужно проверить, нет ли там дополнительного grass блока
-                const treeStartY = surfaceHeight + 1;
-                
-                // Если на treeStartY уже есть блок (например, дополнительный grass), начинаем с treeStartY + 1
-                const treeStartKey = `${worldQ},${worldR},${treeStartY}`;
-                const actualStartY = blockMap.has(treeStartKey) ? treeStartY + 1 : treeStartY;
+              const treeStartY = surfaceHeight + 1;
+              const treeStartKey = `${worldQ},${worldR},${treeStartY}`;
+              const actualStartY = blockMap.has(treeStartKey) ? treeStartY + 1 : treeStartY;
 
-                // Ствол
-                for (let i = 0; i < trunkHeight && actualStartY + i < maxY; i++) {
-                  const trunkY = actualStartY + i;
-                  const trunkKey = `${worldQ},${worldR},${trunkY}`;
+              let trunkBlock = 'wood';
+              let leavesBlock = 'leaves';
+              let canopyLayers = [
+                { y: actualStartY + trunkHeight, radius: 2 },
+                { y: actualStartY + trunkHeight + 1, radius: 1 },
+                { y: actualStartY + trunkHeight - 1, radius: 2 }
+              ];
 
-                  if (!blockMap.has(trunkKey)) {
-                    blocks.push({
-                      type: 'wood',
-                      position: { q: worldQ, r: worldR, s: -worldQ - worldR, y: trunkY }
-                    });
-                    blockMap.set(trunkKey, { type: 'wood', position: { q: worldQ, r: worldR, s: -worldQ - worldR, y: trunkY } });
-                  }
-                }
-
-                // Многослойный навес листьев (используем actualStartY вместо surfaceHeight)
-                const canopyLayers = [
-                  { y: actualStartY + trunkHeight, radius: 2 },
-                  { y: actualStartY + trunkHeight + 1, radius: 1 },
-                  { y: actualStartY + trunkHeight - 1, radius: 2 }
+              if (biome === 'darkforest') {
+                trunkBlock = 'spruce';
+                leavesBlock = 'pine';
+                canopyLayers = [
+                  { y: actualStartY + trunkHeight, radius: 3 },
+                  { y: actualStartY + trunkHeight + 1, radius: 2 },
+                  { y: actualStartY + trunkHeight - 1, radius: 3 }
                 ];
-
-                for (const layer of canopyLayers) {
-                  if (layer.y >= maxY || layer.y < 0) continue;
-
-                  for (let dq = -layer.radius; dq <= layer.radius; dq++) {
-                    for (let dr = -layer.radius; dr <= layer.radius; dr++) {
-                      const dist = Math.sqrt(dq * dq + dr * dr);
-                      const shouldPlaceLeaf = dist <= layer.radius &&
-                                             !(Math.abs(dq) === layer.radius && Math.abs(dr) === layer.radius && Math.random() > 0.7);
-
-                      if (shouldPlaceLeaf) {
-                        const leafQ = worldQ + dq;
-                        const leafR = worldR + dr;
-                        const leafKey = `${leafQ},${leafR},${layer.y}`;
-
-                        if (!blockMap.has(leafKey)) {
-                          blocks.push({
-                            type: 'leaves',
-                            position: { q: leafQ, r: leafR, s: -leafQ - leafR, y: layer.y }
-                          });
-                          blockMap.set(leafKey, { type: 'leaves', position: { q: leafQ, r: leafR, s: -leafQ - leafR, y: layer.y } });
-                          structureMap.add(`${leafQ},${leafR}`);
-                        }
-                      }
-                    }
-                  }
-                }
-
-                structureMap.add(structureKey);
+              } else if (biome === 'aether') {
+                trunkBlock = 'aetherwood';
+                leavesBlock = 'aetherleaf';
+                canopyLayers = [
+                  { y: actualStartY + trunkHeight, radius: 2 },
+                  { y: actualStartY + trunkHeight + 1, radius: 1 }
+                ];
               }
+
+              this.placeTree(worldQ, worldR, actualStartY, trunkHeight, trunkBlock, leavesBlock, canopyLayers, blockMap, blocks, maxY);
+              structureMap.add(structureKey);
             }
           }
         }
       }
     }
     this.generateFooStructure(chunkQ, chunkR, smoothedHeightMap, blockMap, blocks);
+    this.generateCaveTunnel(chunkQ, chunkR, smoothedHeightMap, blockMap, blocks);
+    this.generateWoodenPlatform(chunkQ, chunkR, smoothedHeightMap, blockMap, blocks);
 
     // Финализация
     const validatedBlockMap = new Map<string, Block>();
@@ -636,10 +821,12 @@ export class ChunkGenerator {
     const zoneHash = (biomeZoneQ * 73856093) ^ (biomeZoneR * 19349663) ^ (this.seed * 83492791);
     const biomeIndex = Math.abs(zoneHash) % 100;
 
-    if (biomeIndex < 40) return 'grassland';
-    else if (biomeIndex < 60) return 'desert';
-    else if (biomeIndex < 75) return 'snow';
+    if (biomeIndex < 30) return 'grassland';
+    else if (biomeIndex < 45) return 'darkforest';
+    else if (biomeIndex < 55) return 'desert';
+    else if (biomeIndex < 70) return 'snow';
     else if (biomeIndex < 85) return 'frozen';
+    else if (biomeIndex < 95) return 'aether';
     else return 'stone';
   }
 

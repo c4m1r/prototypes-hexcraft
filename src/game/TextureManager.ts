@@ -116,9 +116,53 @@ export class TextureManager {
       opacity: 0.75
     });
 
+    this.blockConfigs.set('spruce', {
+      top: { row: 3, col: 2 },
+      side: { row: 3, col: 2 }
+    });
+
+    this.blockConfigs.set('pine', {
+      top: { row: 3, col: 3 },
+      side: { row: 3, col: 3 },
+      transparent: true,
+      opacity: 0.85
+    });
+
+    this.blockConfigs.set('aethergrass', {
+      top: { row: 3, col: 5 },
+      side: { row: 3, col: 6 }
+    });
+
+    this.blockConfigs.set('aether', {
+      top: { row: 3, col: 7 },
+      side: { row: 3, col: 7 }
+    });
+
+    this.blockConfigs.set('crystal', {
+      top: { row: 3, col: 8 },
+      side: { row: 3, col: 8 }
+    });
+
+    this.blockConfigs.set('aetherwood', {
+      top: { row: 3, col: 9 },
+      side: { row: 3, col: 9 }
+    });
+
+    this.blockConfigs.set('aetherstone', {
+      top: { row: 3, col: 10 },
+      side: { row: 3, col: 10 }
+    });
+
+    this.blockConfigs.set('aetherleaf', {
+      top: { row: 3, col: 11 },
+      side: { row: 3, col: 11 },
+      transparent: true,
+      opacity: 0.4
+    });
+
     this.blockConfigs.set('foo', {
-      top: { row: 3, col: 2 }, // foo top
-      side: { row: 3, col: 2 } // foo side
+      top: { row: 3, col: 4 },
+      side: { row: 3, col: 4 }
     });
 
     // Ряд 1: дополнительные блоки

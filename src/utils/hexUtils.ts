@@ -269,51 +269,6 @@ export function createHexGeometryWithUV(): THREE.BufferGeometry {
     indices.push(b, d, c);
   }
 
-  /*
-    -------------------------
-    ФИНАЛИЗАЦИЯ
-    -------------------------
-  */
-
-  geometry.setIndex(indices);
-  geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
-  geometry.setAttribute('normal', new THREE.Float32BufferAttribute(normals, 3));
-  geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
-
-  geometry.computeBoundingSphere();
-
-  return geometry;
-}
-
-    // Верхние вершины боковой грани
-    vertices.push(x, height / 2, z);
-    normals.push(Math.cos(angle), 0, Math.sin(angle));
-    // UV для боковой грани - маппинг на sideTexture в атласе
-    const u = sideUStart + (i / segments) * (sideUEnd - sideUStart);
-    const v = sideVEnd; // Верх боковой текстуры
-    uvs.push(u, v);
-
-    // Нижние вершины боковой грани
-    vertices.push(x, -height / 2, z);
-    normals.push(Math.cos(angle), 0, Math.sin(angle));
-    uvs.push(u, sideVStart); // Низ боковой текстуры
-
-    // Верхние вершины следующей грани
-    vertices.push(nextX, height / 2, nextZ);
-    normals.push(Math.cos(nextAngle), 0, Math.sin(nextAngle));
-    const nextU = sideUStart + ((i + 1) / segments) * (sideUEnd - sideUStart);
-    uvs.push(nextU, sideVEnd);
-
-    // Нижние вершины следующей грани
-    vertices.push(nextX, -height / 2, nextZ);
-    normals.push(Math.cos(nextAngle), 0, Math.sin(nextAngle));
-    uvs.push(nextU, sideVStart);
-
-    const baseIdx = sideStartIndex + i * 4;
-    indices.push(baseIdx, baseIdx + 1, baseIdx + 2);
-    indices.push(baseIdx + 1, baseIdx + 3, baseIdx + 2);
-  }
-
   geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
   geometry.setAttribute('normal', new THREE.Float32BufferAttribute(normals, 3));
   geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
